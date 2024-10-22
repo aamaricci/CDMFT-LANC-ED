@@ -2,6 +2,9 @@
 
 A Lanczos based solver for the **Cluster** Dynamical Mean-Field Theory using the `N_up:N_dw` implementation in the normal phase (plus long-range magnetic or charge order).  
 
+
+SUPERC Code
+
 The code is based on:  
 
 * [SciFortran](https://github.com/QcmPlab/SciFortran)  
