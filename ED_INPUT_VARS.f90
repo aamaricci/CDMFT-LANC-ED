@@ -11,9 +11,10 @@ MODULE ED_INPUT_VARS
   !input variables
   !=========================================================
   integer              :: Nlat                !# of cluster sites
-  integer              :: Norb                !# of lattice orbitals per site
-  integer              :: Nspin               !# spin degeneracy (max 2)
-  integer              :: Nbath               !# of bath sites (per orbital or not depending on bath_type)
+  integer(c_int), bind(c, name="Norb")                               :: Norb                !Number of impurity orbitals
+  integer(c_int), bind(c, name="Nspin")                              :: Nspin               !Number spin degeneracy (max 2)
+  integer(c_int), bind(c, name="Nbath")                              :: Nbath               !Number of bath sites (per orbital or not depending on bath_type)
+
   character(len=7)     :: bath_type           !bath representation choice (here either "replica" or "general")
   integer              :: nloop               !max dmft loop variables
   real(8),dimension(5) :: Uloc                !local interactions
@@ -217,14 +218,14 @@ contains
     endif
     !
     if(nread .ne. 0d0) then
-      inquire(file="xmu.restart",EXIST=bool)
-      if(bool)then
-         open(free_unit(unit_xmu),file="xmu.restart")
-         read(unit_xmu,*)xmu,ndelta
-         ndelta=abs(ndelta)*ncoeff
-         close(unit_xmu)
-         write(*,"(A,F9.7,A)")"Adjusting XMU to ",xmu," as per provided xmu.restart ",LOGfile
-      endif
+       inquire(file="xmu.restart",EXIST=bool)
+       if(bool)then
+          open(free_unit(unit_xmu),file="xmu.restart")
+          read(unit_xmu,*)xmu,ndelta
+          ndelta=abs(ndelta)*ncoeff
+          close(unit_xmu)
+          write(*,"(A,F9.7,A)")"Adjusting XMU to ",xmu," as per provided xmu.restart ",LOGfile
+       endif
     endif
     !Act on the input variable only after printing.
     !In the new parser variables are hard-linked into the list:
