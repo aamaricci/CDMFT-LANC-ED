@@ -3,12 +3,21 @@
 
 We annotate here the strategy and the implementation of the code  support for Superconductivity. The aim of these notes is to share the workload and keep an updated list of the open/closed issues 
 
+The aim is to update the code introducting **superc**onducting channel using `EDIpack2.0` structure as a template, there including the comments for auto-documentation.
 
+
+Legend:   
+`[ ] `= to be done   
+`[o]` = done by to be reviewed  
+`[X]` = done and checked    
 ## Milestone 1: code structure
-[X] Update structure of the library by adopting the `EDIpack2.0` template structure (with obvious differences)
+[o] Update structure of the library by adopting the `EDIpack2.0` template structure (with obvious differences)
 
-## Milestone 2: variables and Bath  
-[ ] Implement changes into global and input variables `ED_INPUT_VARS` `ED_VARS_GLOBAL`: these two modules will be eventually updated again later. Special attention to the bath data structure defined here and the implementation of the `sector` type.
+## Milestone 2: Variables, Functions and Bath  
+[o] Implement changes into global and input variables `ED_INPUT_VARS` `ED_VARS_GLOBAL`: these two modules will be eventually updated again later. Special attention to the bath data structure defined here and the implementation of the `sector` type.
+
+
+[o] Implement changes into `ED_AUX_FUNX` 
 
 [ ] Import the required changes into the `ED_BATH` directory where all the bath and fit related functions are implemented. We try to follow the structure of `EDIpack` here too. Specially we separate the routines in different modules dealing with: `aux` auxiliary functions which are used in the code, `user_bath` which deals with functions for the user bath, `dmft_bath` which contains functions dealing with the internal data structure containing the bath, `bath_functions` which contains the local functions of the bath, i.e. non-interacting Anderson, its inverse and the hybridization function (these will be used later in evaluation of the GF), `fit` dealing with fit of the bath. 
 **The development of this part is very import and must be done with great attention** 

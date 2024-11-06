@@ -10,43 +10,54 @@ MODULE ED_INPUT_VARS
 
   !input variables
   !=========================================================
-  integer              :: Nlat                !# of cluster sites
+  integer(c_int), bind(c, name="Nlat")                               :: Nlat                !Number of cluster sites
   integer(c_int), bind(c, name="Norb")                               :: Norb                !Number of impurity orbitals
   integer(c_int), bind(c, name="Nspin")                              :: Nspin               !Number spin degeneracy (max 2)
   integer(c_int), bind(c, name="Nbath")                              :: Nbath               !Number of bath sites (per orbital or not depending on bath_type)
 
-  character(len=7)     :: bath_type           !bath representation choice (here either "replica" or "general")
-  integer              :: nloop               !max dmft loop variables
-  real(8),dimension(5) :: Uloc                !local interactions
-  real(8)              :: Ust                 !intra-orbitals interactions
-  real(8)              :: Jh                  !J_Hund: Hunds' coupling constant 
-  real(8)              :: Jx                  !J_X: coupling constant for the spin-eXchange interaction term
-  real(8)              :: Jp                  !J_P: coupling constant for the Pair-hopping interaction term 
-  real(8)              :: xmu                 !chemical potential
-  real(8)              :: beta                !inverse temperature
-  real(8)              :: eps                 !broadening
-  real(8)              :: wini,wfin           !
-  integer              :: Nsuccess            !
+
+  integer(c_int), bind(c, name="Nloop")                              :: Nloop               !max dmft loop variables
+  real(c_double),dimension(5),bind(c, name="Uloc")                   :: Uloc                !local interactions
+  real(c_double),bind(c, name="Ust")                                 :: Ust                 !intra-orbitals interactions
+  real(c_double),bind(c, name="Jh")                                  :: Jh                  !J_Hund: Hunds' coupling constant 
+  real(c_double),bind(c, name="Jx")                                  :: Jx                  !J_X: coupling constant for the spin-eXchange interaction term
+  real(c_double),bind(c, name="Jp")                                  :: Jp                  !J_P: coupling constant for the Pair-hopping interaction term 
+  real(c_double),bind(c, name="xmu")                                 :: xmu                 !chemical potential
+  real(c_double),bind(c, name="beta")                                :: beta                !inverse temperature
+
+  integer(c_int), bind(c, name="Nsuccess")                           :: Nsuccess            !Number of repeated success to fall below convergence threshold  
+  real(c_double),bind(c, name="dmft_error")                          :: dmft_error          !dmft convergence threshold
+  real(c_double),bind(c, name="eps")                                 :: eps                 !broadening
+  real(c_double),bind(c, name="wini")                                :: wini                !frequency range min
+  real(c_double),bind(c, name="wfin")                                :: wfin                !frequency range max
+  real(c_double),bind(c, name="sb_field")                            :: sb_field            !symmetry breaking field
+  real(c_double),bind(c, name="nread")                               :: nread               !fixed density. if 0.d0 fixed chemical potential calculation.
+  logical(c_bool),bind(c, name="ed_twin")                            :: ed_twin             !flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.
+  logical                                                            :: ed_twin_
+
+
   logical              :: chiflag             !
   logical              :: gf_flag             !flag to evaluate Green's functions (and related quantities)
   logical              :: dm_flag             !flag to evaluate the cluster density matrix \rho_IMP = Tr_BATH(\rho)) 
   logical              :: HFmode              !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
   real(8)              :: cutoff              !cutoff for spectral summation
   real(8)              :: gs_threshold        !Energy threshold for ground state degeneracy loop up
+  real(8)              :: deltasc             !breaking symmetry field
   real(8)              :: dmft_error          !dmft convergence threshold
-  real(8)              :: sb_field            !symmetry breaking field
-  real(8)              :: hwband              !half-bandwidth for the bath initialization (diagonal part in Hbath)
-  !
-  integer              :: ed_verbose          !
+
+  character(len=7)     :: ed_mode             !flag to set ed symmetry type: normal=normal (default), superc=superconductive, nonsu2=broken SU(2)
+  logical              :: ed_finite_temp      !flag to select finite temperature method. note that if T then lanc_nstates_total must be > 1 
   logical              :: ed_sparse_H         !flag to select  storage of sparse matrix H (mem--, cpu++) if TRUE, or direct on-the-fly H*v product (mem++, cpu--
   logical              :: ed_gf_symmetric     !flag to assume G_ij = G_ji
   logical              :: ed_print_Sigma      !flag to print impurity Self-energies
   logical              :: ed_print_G          !flag to print impurity Green`s functions
   logical              :: ed_print_G0         !flag to print impurity non-interacting Green`s functions
-  logical              :: ed_twin             !flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.
   logical              :: ed_sectors          !flag to reduce sector scan for the spectrum to specific sectors +/- ed_sectors_shift
   integer              :: ed_sectors_shift    !shift to the ed_sectors scan
-  !
+  integer              :: ed_verbose          !
+  real(8)              :: ed_offset_bath      !half-bandwidth for the bath initialization: flat in -hwband:hwband
+  real(8)              :: ed_hw_band              !half-bandwidth for the bath initialization (diagonal part in Hbath)
+
   character(len=12)    :: lanc_method         !select the lanczos method to be used in the determination of the spectrum. ARPACK (default), LANCZOS (T=0 only) 
   real(8)              :: lanc_tolerance      !Tolerance for the Lanczos iterations as used in Arpack and plain lanczos. 
   integer              :: lanc_niter          !Max number of Lanczos iterations
@@ -59,22 +70,22 @@ MODULE ED_INPUT_VARS
   integer              :: lanc_dim_threshold  !Min dimension threshold to use Lanczos determination of the spectrum rather than Lapack based exact diagonalization.
   !
   character(len=5)     :: cg_scheme           !fit scheme: delta (default) or weiss for G0and
-  character(len=9)     :: cg_norm             !fit norm: elemental (default) or frobenius norm to evaluate distances |G0 - G0and|
+
   integer              :: cg_method           !fit routine type:0=CGnr (default), 1=minimize (old f77)
   integer              :: cg_grad             !gradient evaluation: 0=analytic, 1=numeric
   integer              :: cg_niter            !Max number of iteration in the fit
   real(8)              :: cg_ftol             !Tolerance in the cg fit
   integer              :: cg_stop             !fit stop condition:0-3, 0=C1.AND.C2, 1=C1, 2=C2 with C1=|F_n-1 -F_n|<tol*(1+F_n), C2=||x_n-1 -x_n||<tol*(1+||x_n||).
-  integer              :: cg_weight           !fit weights on matsubara axis: 0=1, 1=1/n , 2=1/w_n
   integer              :: cg_matrix           !fit weights for matrix elements: for now flat or 'spectral' (normalized according to \sum_iw A(iw))
+  integer              :: cg_weight           !fit weights on matsubara axis: 0=1, 1=1/n , 2=1/w_n
   integer              :: cg_pow              !fit power to generalize the distance as |G0 - G0and|**cg_pow
+  character(len=9)     :: cg_norm             !fit norm: elemental (default) or frobenius norm to evaluate distances |G0 - G0and|
   logical              :: cg_minimize_ver     !flag to pick old (Krauth) or new (Lichtenstein) version of the minimize CG routine
   real(8)              :: cg_minimize_hh      !unknown parameter used in the CG minimize procedure.  
-
   !
   logical              :: finiteT             !flag for finite temperature calculation (UNIMPLEMENTED: hard-linked to lanc_nstates_total=1)
+  character(len=7)     :: bath_type           !bath representation choice (here either "replica" or "general")
   !
-  real(8)              :: nread               !fixed density. if 0.d0 fixed chemical potential calculation.
   real(8)              :: nerr                !fix density threshold. a loop over from 1.d-1 to required nerr is performed
   real(8)              :: ndelta              !initial chemical potential step
   real(8)              :: ncoeff              !multiplier for the initial ndelta read from a file (ndelta-->ndelta*ncoeff)
@@ -82,16 +93,22 @@ MODULE ED_INPUT_VARS
 
   !Some parameters for function dimension:
   !=========================================================
-  integer              :: Lmats
-  integer              :: Lreal
-  integer              :: Lfit
-  integer              :: Ltau
+  !Some parameters for function dimension:
+  integer(c_int),bind(c, name="Lmats")             :: Lmats !Number of Matsubara frequencies
+  integer(c_int),bind(c, name="Lreal")             :: Lreal !Number of real-axis frequencies
+  integer(c_int),bind(c, name="Lfit")              :: Lfit  !Number of frequencies for bath fitting
+  integer(c_int),bind(c, name="Ltau")              :: Ltau  !Number of imaginary time points
+
 
   !LOG AND Hamiltonian UNITS
   !=========================================================
-  character(len=100)   :: Hfile,HLOCfile
-  integer,save         :: LOGfile
-  character(len=200)   :: ed_input_file=""
+  character(len=100)   :: Hfile  !File where to retrieve/store the bath parameters.
+  character(len=100)   :: HLOCfile !File read the input local H
+  character(len=100)   :: SectorFile !File where to retrieve/store the sectors contributing to the spectrum
+  integer(c_int),bind(c, name="LOGfile"),save             :: LOGfile  !Logfile unit
+
+  !THIS IS JUST A RELOCATED GLOBAL VARIABLE
+  character(len=200)                                 :: ed_input_file="" !Name of input file
 
 
 
@@ -127,6 +144,9 @@ contains
     call parse_input_variable(Nspin,"NSPIN",INPUTunit,default=1,comment="Number of spin degeneracy (max 2)")
     call parse_input_variable(Nbath,"NBATH",INPUTunit,default=6,comment="Number of bath clusters (replicas or generalizations)")
     call parse_input_variable(bath_type,"BATH_TYPE",INPUTunit,default='replica',comment="flag to set bath type: 'replica' or 'general'")
+
+
+
     call parse_input_variable(uloc,"ULOC",INPUTunit,default=[2d0,0d0,0d0,0d0,0d0],comment="Values of the local interaction per orbital (max 5)")
     call parse_input_variable(ust,"UST",INPUTunit,default=0.d0,comment="Value of the inter-orbital interaction term")
     call parse_input_variable(Jh,"JH",INPUTunit,default=0.d0,comment="Hunds coupling")
@@ -140,6 +160,8 @@ contains
     call parse_input_variable(gf_flag,"GF_FLAG",INPUTunit,default=.true.,comment="flag to evaluate GFs and related quantities.")
     call parse_input_variable(dm_flag,"DM_FLAG",INPUTunit,default=.false.,comment="flag to evaluate the cluster density matrix \rho_IMP = Tr_BATH(\rho))")
     !
+
+    call parse_input_variable(ed_mode,"ED_MODE",INPUTunit,default='normal',comment="Flag to set ED type: normal=normal, superc=superconductive, nonsu2=broken SU(2)")
     call parse_input_variable(ed_twin,"ED_TWIN",INPUTunit,default=.false.,comment="flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.")
     call parse_input_variable(ed_sectors,"ED_SECTORS",INPUTunit,default=.false.,comment="flag to reduce sector scan for the spectrum to specific sectors +/- ed_sectors_shift.")
     call parse_input_variable(ed_sectors_shift,"ED_SECTORS_SHIFT",INPUTunit,1,comment="shift to ed_sectors")
@@ -149,7 +171,9 @@ contains
     call parse_input_variable(ed_print_G,"ED_PRINT_G",INPUTunit,default=.true.,comment="flag to print impurity Greens function")
     call parse_input_variable(ed_print_G0,"ED_PRINT_G0",INPUTunit,default=.true.,comment="flag to print non-interacting impurity Greens function")
     call parse_input_variable(ed_verbose,"ED_VERBOSE",INPUTunit,default=3,comment="Verbosity level: 0=almost nothing --> 5:all. Really: all")
-    !
+    call parse_input_variable(ed_hw_bath,"ed_hw_bath",INPUTunit,default=2d0,comment="half-bandwidth for the bath initialization: flat in -ed_hw_bath:ed_hw_bath")
+    call parse_input_variable(ed_offset_bath,"ed_offset_bath",INPUTunit,default=1d-1,comment="offset for the initialization of diagonal terms in replica/general bath: -offset:offset")
+
     call parse_input_variable(nsuccess,"NSUCCESS",INPUTunit,default=1,comment="Number of successive iterations below threshold for convergence")
     call parse_input_variable(Lmats,"LMATS",INPUTunit,default=5000,comment="Number of Matsubara frequencies.")
     call parse_input_variable(Lreal,"LREAL",INPUTunit,default=5000,comment="Number of real-axis frequencies.")
@@ -166,7 +190,6 @@ contains
     call parse_input_variable(eps,"EPS",INPUTunit,default=0.01d0,comment="Broadening on the real-axis.")
     call parse_input_variable(cutoff,"CUTOFF",INPUTunit,default=1.d-9,comment="Spectrum cut-off, used to determine the number states to be retained.")
     call parse_input_variable(gs_threshold,"GS_THRESHOLD",INPUTunit,default=1.d-9,comment="Energy threshold for ground state degeneracy loop up")
-    call parse_input_variable(hwband,"HWBAND",INPUTunit,default=2d0,comment="half-bandwidth for the bath initialization (diagonal part in Hbath)")
     !    
     call parse_input_variable(lanc_method,"LANC_METHOD",INPUTunit,default="arpack",comment="select the lanczos method to be used in the determination of the spectrum. ARPACK (default), LANCZOS (T=0 only), DVDSON (no MPI)")
     call parse_input_variable(lanc_nstates_sector,"LANC_NSTATES_SECTOR",INPUTunit,default=2,comment="Initial number of states per sector to be determined.")
@@ -191,6 +214,8 @@ contains
     call parse_input_variable(cg_pow,"CG_POW",INPUTunit,default=2,comment="Fit power for the calculation of the generalized distance as |G0 - G0and|**cg_pow")
     call parse_input_variable(cg_minimize_ver,"CG_MINIMIZE_VER",INPUTunit,default=.false.,comment="Flag to pick old/.false. (Krauth) or new/.true. (Lichtenstein) version of the minimize CG routine")
     call parse_input_variable(cg_minimize_hh,"CG_MINIMIZE_HH",INPUTunit,default=1d-4,comment="Unknown parameter used in the CG minimize procedure.")
+
+    call parse_input_variable(SectorFile,"SectorFile",INPUTunit,default="sectors",comment="File where to retrieve/store the sectors contributing to the spectrum.")
     call parse_input_variable(Hfile,"HFILE",INPUTunit,default="hamiltonian",comment="File where to retrieve/store the bath parameters.")
     call parse_input_variable(HLOCfile,"impHfile",INPUTunit,default="inputHLOC.in",comment="File read the input local H.")
     call parse_input_variable(LOGfile,"LOGFILE",INPUTunit,default=6,comment="LOG unit.")

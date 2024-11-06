@@ -81,23 +81,23 @@ MODULE ED_AUX_FUNX
   end interface ed_set_suffix
 
 
-#if __GNUC__ > 6
-  interface read(unformatted)
-     module procedure :: read_unformatted
-  end interface read(unformatted)
+  ! #if __GNUC__ > 6
+  !   interface read(unformatted)
+  !      module procedure :: read_unformatted
+  !   end interface read(unformatted)
 
-  interface write(unformatted)
-     module procedure :: write_unformatted
-  end interface write(unformatted)
+  !   interface write(unformatted)
+  !      module procedure :: write_unformatted
+  !   end interface write(unformatted)
 
-  interface read(formatted)
-     module procedure :: read_formatted
-  end interface read(formatted)
+  !   interface read(formatted)
+  !      module procedure :: read_formatted
+  !   end interface read(formatted)
 
-  interface write(formatted)
-     module procedure :: write_formatted
-  end interface write(formatted)
-#endif
+  !   interface write(formatted)
+  !      module procedure :: write_formatted
+  !   end interface write(formatted)
+  ! #endif
 
 
 
@@ -1070,254 +1070,6 @@ contains
 
 
 
-
-
-
-
-#if __GNUC__ > 6
-  !##################################################################
-  !##################################################################
-  ! ROUTINES TO READ AND WRITE CLUSTER GREEN FUNCTION
-  ! unformatted and formatted I/O
-  !##################################################################
-  !##################################################################
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : write overload for GFmatrix type (formatted)
-  !+-------------------------------------------------------------------+
-
-  subroutine write_formatted(dtv, unit, iotype, v_list, iostat, iomsg)
-    class(GFmatrix), intent(in)         :: dtv
-    integer, intent(in)                 :: unit
-    integer, intent(out)                :: iostat
-    character(*), intent(in)            :: iotype
-    integer, intent(in)                 :: v_list(:)
-    integer                             :: Nexc,iexc,Ichan,ilat,jlat,iorb,ispin,istate
-    integer                             :: Nchan,Nstates
-    character(*), intent(inout)         :: iomsg
-    !
-    !
-    Nstates = size(dtv%state)
-    write (unit, *,IOSTAT=iostat, IOMSG=iomsg) Nstates
-    do istate=1,Nstates
-       Nchan = size(dtv%state(istate)%channel)
-       write (unit, *,IOSTAT=iostat, IOMSG=iomsg) Nchan
-       do ichan=1,Nchan
-          write (unit, *,IOSTAT=iostat, IOMSG=iomsg) size(dtv%state(istate)%channel(ichan)%poles)
-          write (unit, *,IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%poles
-          write (unit, *,IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%weight
-       enddo
-       write (unit, *,IOSTAT=iostat, IOMSG=iomsg) "\n"
-    enddo
-    !
-  end subroutine write_formatted
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : read overload for GFmatrix type (formatted)
-  !+-------------------------------------------------------------------+
-
-  subroutine read_formatted(dtv, unit,iotype, v_list, iostat, iomsg)
-    class(GFmatrix), intent(inout)                :: dtv
-    integer, intent(in)                           :: unit
-    integer, intent(out)                          :: iostat
-    character(*), intent(in)                      :: iotype
-    integer, intent(in)                           :: v_list(:)
-    character(*), intent(inout)                   :: iomsg
-    logical                                       :: alloc
-    integer                                       :: ichan,Nchan,Nlanc,istate,Nstates
-    !
-    read (unit,*,IOSTAT=iostat, IOMSG=iomsg) Nstates
-    call GFmatrix_allocate(dtv,Nstate=Nstates)
-    do istate=1,Nstates
-       read (unit,*,IOSTAT=iostat, IOMSG=iomsg) Nchan
-       call GFmatrix_allocate(dtv,istate=istate,Nchan=Nchan)
-       do ichan=1,Nchan
-          read (unit,*, IOSTAT=iostat, IOMSG=iomsg) Nlanc
-          call GFmatrix_allocate(dtv,istate=istate,ichan=ichan,Nexc=Nlanc)
-          read (unit, *, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%poles
-          read (unit, *, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%weight
-       enddo
-    enddo
-    !
-  end subroutine read_formatted
-
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : write overload for GFmatrix type (unformatted)
-  !+-------------------------------------------------------------------+
-
-  subroutine write_unformatted(dtv, unit, iostat, iomsg)
-    class(GFmatrix), intent(in)         :: dtv
-    integer, intent(in)                 :: unit
-    integer, intent(out)                :: iostat
-    integer                             :: Nexc,iexc,Ichan,ilat,jlat,iorb,ispin,istate
-    integer                             :: Nchan,Nstates
-    character(*), intent(inout)         :: iomsg
-    !
-    !
-    Nstates = size(dtv%state)
-    write (unit, IOSTAT=iostat, IOMSG=iomsg) Nstates
-    do istate=1,Nstates
-       Nchan = size(dtv%state(istate)%channel)
-       write (unit, IOSTAT=iostat, IOMSG=iomsg) Nchan
-       do ichan=1,Nchan
-          write (unit, IOSTAT=iostat, IOMSG=iomsg) size(dtv%state(istate)%channel(ichan)%poles), dtv%state(istate)%channel(ichan)%poles, dtv%state(istate)%channel(ichan)%weight
-       enddo
-    enddo
-    !
-  end subroutine write_unformatted
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : read overload for GFmatrix type (unformatted)
-  !+-------------------------------------------------------------------+
-
-  subroutine read_unformatted(dtv, unit, iostat, iomsg)
-    class(GFmatrix), intent(inout)                :: dtv
-    integer, intent(in)                           :: unit
-    integer, intent(out)                          :: iostat
-    character(*), intent(inout)                   :: iomsg
-    logical                                       :: alloc
-    integer                                       :: ichan,Nchan,Nlanc,istate,Nstates
-    !
-    read (unit, IOSTAT=iostat, IOMSG=iomsg) Nstates
-    call GFmatrix_allocate(dtv,Nstate=Nstates)
-    do istate=1,Nstates
-       read (unit, IOSTAT=iostat, IOMSG=iomsg) Nchan
-       call GFmatrix_allocate(dtv,istate=istate,Nchan=Nchan)
-       do ichan=1,Nchan
-          read (unit, IOSTAT=iostat, IOMSG=iomsg) Nlanc
-          call GFmatrix_allocate(dtv,istate=istate,ichan=ichan,Nexc=Nlanc)
-          read (unit, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%poles
-          read (unit, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%weight
-       enddo
-    enddo
-    !
-  end subroutine read_unformatted
-
-#endif
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : Save cluster GF to file
-  !+-------------------------------------------------------------------+
-
-  subroutine save_gfprime(file,used,use_formatted)
-
-    character(len=*),optional :: file
-    character(len=256)        :: file_
-    logical,optional          :: used
-    logical                   :: used_
-    logical,optional          :: use_formatted
-    logical                   :: use_formatted_
-    character(len=16)         :: extension
-    integer                   :: unit_,Nchannel,Nexc,ichan,iexc,ilat,jlat,ispin,iorb,jorb
-    !
-#if __GNUC__ > 6
-    if(.not.allocated(impGmatrix))stop "ed_gf_cluster ERROR: impGmatrix not allocated!"
-    used_=.false.;if(present(used))used_=used
-    use_formatted_=.false.;if(present(use_formatted))use_formatted_=use_formatted
-    extension=".restart";if(used_)extension=".used"
-    file_=str(str(file)//str(ed_file_suffix)//str(extension))
-    unit_=free_unit()
-    !
-    if(use_formatted_)then
-       open(unit_,file=str(file_),access='sequential')
-    else
-       open(unit_,file=str(file_),form='unformatted',access='sequential')
-    endif
-    !
-    do ilat=1,Nlat
-       do jlat=1,Nlat
-          do ispin=1,Nspin
-             do iorb=1,Norb
-                do jorb=1,Norb
-                   if(use_formatted_)then
-                      write(unit_,*)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
-                   else
-                      write(unit_)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
-                   endif
-                enddo
-             enddo
-          enddo
-       enddo
-    enddo
-    close(unit_)
-#else
-    print*,"Rear/write overloading requires Gfortran 6+"
-#endif
-  end subroutine save_gfprime
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : Read cluster GF from file
-  !+-------------------------------------------------------------------+
-
-  subroutine read_gfprime(file,used,use_formatted)
-    character(len=*),optional :: file
-    character(len=256)        :: file_
-    logical,optional          :: used
-    logical                   :: used_
-    logical,optional          :: use_formatted
-    logical                   :: use_formatted_
-    character(len=16)         :: extension
-    integer                   :: unit_,Nchannel,Nexc,ichan,iexc,ilat,jlat,ispin,iorb,jorb
-    !
-#if __GNUC__ > 6
-    if(allocated(impGmatrix))deallocate(impGmatrix)
-    allocate(impGmatrix(Nlat,Nlat,Nspin,Nspin,Norb,Norb))
-    used_=.false.;if(present(used))used_=used
-    use_formatted_=.false.;if(present(use_formatted))use_formatted_=use_formatted
-    extension=".restart";if(used_)extension=".used"
-    file_=str(str(file)//str(ed_file_suffix)//str(extension))
-    unit_=free_unit()
-    !
-    if(use_formatted_)then
-       open(unit_,file=str(file_),access='sequential')
-    else
-       open(unit_,file=str(file_),form='unformatted',access='sequential')
-    endif
-    !
-    rewind(unit_)
-    !
-    do ilat=1,Nlat
-       do jlat=1,Nlat
-          do ispin=1,Nspin
-             do iorb=1,Norb
-                do jorb=1,Norb
-                   if(use_formatted_)then
-                      read(unit_,*)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
-                   else
-                      read(unit_)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
-                   endif
-                enddo
-             enddo
-          enddo
-       enddo
-    enddo
-    close(unit_)
-#else
-    print*,"Rear/write overloading requires Gfortran 6+"
-#endif
-  end subroutine read_gfprime
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   !##################################################################
   !##################################################################
   ! ROUTINES TO SEARCH CHEMICAL POTENTIAL UP TO SOME ACCURACY
@@ -1727,3 +1479,247 @@ contains
 
 
 END MODULE ED_AUX_FUNX
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+! #if __GNUC__ > 6
+!   !##################################################################
+!   !##################################################################
+!   ! ROUTINES TO READ AND WRITE CLUSTER GREEN FUNCTION
+!   ! unformatted and formatted I/O
+!   !##################################################################
+!   !##################################################################
+
+!   !+-------------------------------------------------------------------+
+!   !PURPOSE  : write overload for GFmatrix type (formatted)
+!   !+-------------------------------------------------------------------+
+
+!   subroutine write_formatted(dtv, unit, iotype, v_list, iostat, iomsg)
+!     class(GFmatrix), intent(in)         :: dtv
+!     integer, intent(in)                 :: unit
+!     integer, intent(out)                :: iostat
+!     character(*), intent(in)            :: iotype
+!     integer, intent(in)                 :: v_list(:)
+!     integer                             :: Nexc,iexc,Ichan,ilat,jlat,iorb,ispin,istate
+!     integer                             :: Nchan,Nstates
+!     character(*), intent(inout)         :: iomsg
+!     !
+!     !
+!     Nstates = size(dtv%state)
+!     write (unit, *,IOSTAT=iostat, IOMSG=iomsg) Nstates
+!     do istate=1,Nstates
+!        Nchan = size(dtv%state(istate)%channel)
+!        write (unit, *,IOSTAT=iostat, IOMSG=iomsg) Nchan
+!        do ichan=1,Nchan
+!           write (unit, *,IOSTAT=iostat, IOMSG=iomsg) size(dtv%state(istate)%channel(ichan)%poles)
+!           write (unit, *,IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%poles
+!           write (unit, *,IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%weight
+!        enddo
+!        write (unit, *,IOSTAT=iostat, IOMSG=iomsg) "\n"
+!     enddo
+!     !
+!   end subroutine write_formatted
+
+!   !+-------------------------------------------------------------------+
+!   !PURPOSE  : read overload for GFmatrix type (formatted)
+!   !+-------------------------------------------------------------------+
+
+!   subroutine read_formatted(dtv, unit,iotype, v_list, iostat, iomsg)
+!     class(GFmatrix), intent(inout)                :: dtv
+!     integer, intent(in)                           :: unit
+!     integer, intent(out)                          :: iostat
+!     character(*), intent(in)                      :: iotype
+!     integer, intent(in)                           :: v_list(:)
+!     character(*), intent(inout)                   :: iomsg
+!     logical                                       :: alloc
+!     integer                                       :: ichan,Nchan,Nlanc,istate,Nstates
+!     !
+!     read (unit,*,IOSTAT=iostat, IOMSG=iomsg) Nstates
+!     call GFmatrix_allocate(dtv,Nstate=Nstates)
+!     do istate=1,Nstates
+!        read (unit,*,IOSTAT=iostat, IOMSG=iomsg) Nchan
+!        call GFmatrix_allocate(dtv,istate=istate,Nchan=Nchan)
+!        do ichan=1,Nchan
+!           read (unit,*, IOSTAT=iostat, IOMSG=iomsg) Nlanc
+!           call GFmatrix_allocate(dtv,istate=istate,ichan=ichan,Nexc=Nlanc)
+!           read (unit, *, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%poles
+!           read (unit, *, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%weight
+!        enddo
+!     enddo
+!     !
+!   end subroutine read_formatted
+
+
+
+!   !+-------------------------------------------------------------------+
+!   !PURPOSE  : write overload for GFmatrix type (unformatted)
+!   !+-------------------------------------------------------------------+
+
+!   subroutine write_unformatted(dtv, unit, iostat, iomsg)
+!     class(GFmatrix), intent(in)         :: dtv
+!     integer, intent(in)                 :: unit
+!     integer, intent(out)                :: iostat
+!     integer                             :: Nexc,iexc,Ichan,ilat,jlat,iorb,ispin,istate
+!     integer                             :: Nchan,Nstates
+!     character(*), intent(inout)         :: iomsg
+!     !
+!     !
+!     Nstates = size(dtv%state)
+!     write (unit, IOSTAT=iostat, IOMSG=iomsg) Nstates
+!     do istate=1,Nstates
+!        Nchan = size(dtv%state(istate)%channel)
+!        write (unit, IOSTAT=iostat, IOMSG=iomsg) Nchan
+!        do ichan=1,Nchan
+!           write (unit, IOSTAT=iostat, IOMSG=iomsg) size(dtv%state(istate)%channel(ichan)%poles), dtv%state(istate)%channel(ichan)%poles, dtv%state(istate)%channel(ichan)%weight
+!        enddo
+!     enddo
+!     !
+!   end subroutine write_unformatted
+
+!   !+-------------------------------------------------------------------+
+!   !PURPOSE  : read overload for GFmatrix type (unformatted)
+!   !+-------------------------------------------------------------------+
+
+!   subroutine read_unformatted(dtv, unit, iostat, iomsg)
+!     class(GFmatrix), intent(inout)                :: dtv
+!     integer, intent(in)                           :: unit
+!     integer, intent(out)                          :: iostat
+!     character(*), intent(inout)                   :: iomsg
+!     logical                                       :: alloc
+!     integer                                       :: ichan,Nchan,Nlanc,istate,Nstates
+!     !
+!     read (unit, IOSTAT=iostat, IOMSG=iomsg) Nstates
+!     call GFmatrix_allocate(dtv,Nstate=Nstates)
+!     do istate=1,Nstates
+!        read (unit, IOSTAT=iostat, IOMSG=iomsg) Nchan
+!        call GFmatrix_allocate(dtv,istate=istate,Nchan=Nchan)
+!        do ichan=1,Nchan
+!           read (unit, IOSTAT=iostat, IOMSG=iomsg) Nlanc
+!           call GFmatrix_allocate(dtv,istate=istate,ichan=ichan,Nexc=Nlanc)
+!           read (unit, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%poles
+!           read (unit, IOSTAT=iostat, IOMSG=iomsg) dtv%state(istate)%channel(ichan)%weight
+!        enddo
+!     enddo
+!     !
+!   end subroutine read_unformatted
+
+! #endif
+
+
+!   !+-------------------------------------------------------------------+
+!   !PURPOSE  : Save cluster GF to file
+!   !+-------------------------------------------------------------------+
+
+!   subroutine save_gfprime(file,used,use_formatted)
+
+!     character(len=*),optional :: file
+!     character(len=256)        :: file_
+!     logical,optional          :: used
+!     logical                   :: used_
+!     logical,optional          :: use_formatted
+!     logical                   :: use_formatted_
+!     character(len=16)         :: extension
+!     integer                   :: unit_,Nchannel,Nexc,ichan,iexc,ilat,jlat,ispin,iorb,jorb
+!     !
+! #if __GNUC__ > 6
+!     if(.not.allocated(impGmatrix))stop "ed_gf_cluster ERROR: impGmatrix not allocated!"
+!     used_=.false.;if(present(used))used_=used
+!     use_formatted_=.false.;if(present(use_formatted))use_formatted_=use_formatted
+!     extension=".restart";if(used_)extension=".used"
+!     file_=str(str(file)//str(ed_file_suffix)//str(extension))
+!     unit_=free_unit()
+!     !
+!     if(use_formatted_)then
+!        open(unit_,file=str(file_),access='sequential')
+!     else
+!        open(unit_,file=str(file_),form='unformatted',access='sequential')
+!     endif
+!     !
+!     do ilat=1,Nlat
+!        do jlat=1,Nlat
+!           do ispin=1,Nspin
+!              do iorb=1,Norb
+!                 do jorb=1,Norb
+!                    if(use_formatted_)then
+!                       write(unit_,*)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
+!                    else
+!                       write(unit_)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
+!                    endif
+!                 enddo
+!              enddo
+!           enddo
+!        enddo
+!     enddo
+!     close(unit_)
+! #else
+!     print*,"Rear/write overloading requires Gfortran 6+"
+! #endif
+!   end subroutine save_gfprime
+
+!   !+-------------------------------------------------------------------+
+!   !PURPOSE  : Read cluster GF from file
+!   !+-------------------------------------------------------------------+
+
+!   subroutine read_gfprime(file,used,use_formatted)
+!     character(len=*),optional :: file
+!     character(len=256)        :: file_
+!     logical,optional          :: used
+!     logical                   :: used_
+!     logical,optional          :: use_formatted
+!     logical                   :: use_formatted_
+!     character(len=16)         :: extension
+!     integer                   :: unit_,Nchannel,Nexc,ichan,iexc,ilat,jlat,ispin,iorb,jorb
+!     !
+! #if __GNUC__ > 6
+!     if(allocated(impGmatrix))deallocate(impGmatrix)
+!     allocate(impGmatrix(Nlat,Nlat,Nspin,Nspin,Norb,Norb))
+!     used_=.false.;if(present(used))used_=used
+!     use_formatted_=.false.;if(present(use_formatted))use_formatted_=use_formatted
+!     extension=".restart";if(used_)extension=".used"
+!     file_=str(str(file)//str(ed_file_suffix)//str(extension))
+!     unit_=free_unit()
+!     !
+!     if(use_formatted_)then
+!        open(unit_,file=str(file_),access='sequential')
+!     else
+!        open(unit_,file=str(file_),form='unformatted',access='sequential')
+!     endif
+!     !
+!     rewind(unit_)
+!     !
+!     do ilat=1,Nlat
+!        do jlat=1,Nlat
+!           do ispin=1,Nspin
+!              do iorb=1,Norb
+!                 do jorb=1,Norb
+!                    if(use_formatted_)then
+!                       read(unit_,*)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
+!                    else
+!                       read(unit_)impGmatrix(ilat,jlat,ispin,ispin,iorb,jorb)
+!                    endif
+!                 enddo
+!              enddo
+!           enddo
+!        enddo
+!     enddo
+!     close(unit_)
+! #else
+!     print*,"Rear/write overloading requires Gfortran 6+"
+! #endif
+!   end subroutine read_gfprime

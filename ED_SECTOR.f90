@@ -1,13 +1,7 @@
-!|imp_up>|bath_up> * |imp_dw>|bath_dw>
-!
-!|imp_sigma>=
-!| (1..Norb)_1 ... (1..Norb)_Nlat;         <-- Nlat*Norb == stride, indices here: imp_state_index
-! [(1..Norb)_1 ... (1..Norb)_Nlat]_1       <-- Nlat*Norb + Nlat*Norb, "      "  : imp_state_index
-!  ...
-! [(1..Norb)_1 ... (1..Norb)_Nlat]_Nbath>; <-- Nbath*Norb*Nlat
-!
-!
-MODULE ED_SETUP
+MODULE ED_SECTOR
+  !
+  !Contains procedures to construct the symmetry sectors corresponding to a given set of quantum numbers :math:`\vec{Q}`, in particular it allocated and build the  :f:var:`sector_map` connecting the states of a given sector with the corresponding Fock ones. 
+  !
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX
@@ -22,28 +16,59 @@ MODULE ED_SETUP
   private
 
 
-  ! interface build_sector
-  !    module procedure :: build_sector_full !A unique map for the full sector, separating spins
-  !    module procedure :: build_sector_spin !Two spin-resolved maps, separating imp and bath states
-  ! end interface build_sector
+  interface map_allocate
+     !
+     ! Allocate the map(s) connecting the states in the symmetry sector to thos in the Fock space. 
+     !
+     module procedure :: map_allocate_scalar
+     module procedure :: map_allocate_vector
+  end interface map_allocate
 
-  ! interface delete_sector
-  !    module procedure :: delete_sector_full
-  !    module procedure :: delete_sector_spin
-  ! end interface delete_sector
+  interface map_deallocate
+     module procedure :: map_deallocate_scalar
+     module procedure :: map_deallocate_vector
+  end interface map_deallocate
 
-  public :: init_ed_structure
-  public :: setup_global
-  !
+  interface flip_state
+     module procedure :: flip_state_normal
+     module procedure :: flip_state_other
+  end interface flip_state
+
+  interface get_Sector
+     !
+     ! Returns the index of :f:var:`isector` of the symmetry sector given the quantum numbers :f:var:`qn`
+     !
+     module procedure :: get_Sector_normal
+     module procedure :: get_Sector_superc
+  end interface get_Sector
+
+  interface get_QuantumNumbers
+     !
+     !Returns the quantum numbers :f:var:`qn` given the  index of :f:var:`isector` of the symmetry sector
+     !
+     module procedure :: get_QuantumNumbers_normal
+     module procedure :: get_QuantumNumbers_other
+  end interface get_QuantumNumbers
+
+
+
   public :: build_sector
   public :: delete_sector
+  !
+  ! public :: apply_op_C
+  ! public :: apply_op_CDG
+  ! public :: apply_op_Sz
+  ! public :: apply_op_N
+  ! public :: build_op_Ns
   !
   public :: get_Sector
   public :: get_Indices
   public :: get_Nup
   public :: get_Ndw
+  public :: get_Sz
   public :: get_DimUp
   public :: get_DimDw
+  public :: get_Dim
   !
   public :: indices2state
   public :: state2indices
@@ -62,323 +87,393 @@ MODULE ED_SETUP
 
 contains
 
-  subroutine ed_checks_global
-    !
-    if(Lfit>Lmats)Lfit=Lmats
-    if(Nspin>2)stop "ED ERROR: Nspin > 2 is currently not supported"
-    if(Norb>5)stop "ED ERROR: Norb > 5 is currently not supported"
-    !
-    if(Nspin>1.AND.ed_twin.eqv..true.)then
-       write(LOGfile,"(A)")"WARNING: using twin_sector with Nspin>1"
-       call sleep(1)
-    end if
-    !
-    if(lanc_method=="lanczos")then
-       if(lanc_nstates_total>1)stop "ED ERROR: lanc_method==lanczos available only for lanc_nstates_total==1, T=0"
-       if(lanc_nstates_sector>1)stop "ED ERROR: lanc_method==lanczos available only for lanc_nstates_sector==1, T=0"
-    endif
-    !
-  end subroutine ed_checks_global
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Setup Dimensions of the problem
-  ! Norb    = # of impurity orbitals
-  ! Nbath   = # of bath levels (depending on bath_type)
-  ! Ns      = # of levels (per spin)
-  ! Nlevels = 2*Ns = Total # of levels (counting spin degeneracy 2) 
-  !+------------------------------------------------------------------+
-  subroutine ed_setup_dimensions()
-    !
-    Nimp = Nlat*Norb    !Total number of levels in the impurity cluster
-    Ns = Nimp*(Nbath+1) !Total number of levels per spin
-    !
-    Ns_Orb = Ns
-    Ns_Ud  = 1
-    !
-    Nsectors = ((Ns_Orb+1)*(Ns_Orb+1))**Ns_Ud
-  end subroutine ed_setup_dimensions
 
 
 
-  !+------------------------------------------------------------------+
-  !PURPOSE  : Init ED structure and calculation
-  !+------------------------------------------------------------------+
-  subroutine init_ed_structure()
-    logical                          :: control
-    integer                          :: i,iud,iorb,jorb,ispin,jspin
-    integer,dimension(:),allocatable :: DimUps,DimDws
+
+
+  !######################################################################
+  !######################################################################
+  !BUILD SECTORS: given isector build / delete the corresponding map(s)
+  !######################################################################
+  !######################################################################
+  subroutine build_sector(isector,self,Itrace)
     !
-    call ed_checks_global
+    ! This procedure build the sector :f:type:`sector` :math:`{\cal S}(\vec{Q})` given the index :f:var:`isector` which univocally determines the quantum numbers :math:`\vec{Q}`. All the components of the data structure :f:type:`sector` are determined here. Moreover the map connecting the states of the sector to thos in the Fock space is constructed.
+    ! To avoid integer overflow the loop over Fock space states is decomposed in spin up and down integer so that :math:`I = I_\uparrow + 2^{N}I_\downarrow`.  
     !
-    call ed_setup_dimensions
+    integer                  :: isector
+    type(sector)             :: self
+    logical,optional         :: itrace
+    logical                  :: itrace_
+    integer,dimension(Ns_Ud) :: Nups,Ndws
+    integer,dimension(Ns_Ud) :: DimUps,DimDws
+    integer                  :: DimUp,DimDw,impDIM
+    integer                  :: iup,idw
+    integer                  :: nup_,ndw_
+    integer                  :: imap,iud
+    integer                  :: iIMP,iBATH
     !
+    itrace_=.false. ; if(present(itrace))itrace_=itrace
+    if(self%status)call delete_sector(self)
     !
-    allocate(DimUps(Ns_Ud))
-    allocate(DimDws(Ns_Ud))
-    do iud=1,Ns_Ud
-       DimUps(iud) = get_sector_dimension(Ns_Orb,Ns_Orb/2)
-       DimDws(iud) = get_sector_dimension(Ns_Orb,Ns_Orb-Ns_Orb/2)
-    enddo
-    if(MpiMaster)then
-       write(LOGfile,"(A)")"Summary:"
-       write(LOGfile,"(A)")"--------------------------------------------"
-       write(LOGfile,"(A,I15)")'# of levels/spin      = ',Ns
-       write(LOGfile,"(A,I15)")'Total size            = ',2*Ns
-       write(LOGfile,"(A,I15)")'# of sites            = ',Nlat
-       write(LOGfile,"(A,I15)")'# of impurities       = ',Norb
-       write(LOGfile,"(A,I15)")'# of bath/impurity    = ',Nbath
-       write(LOGfile,"(A,I15)")'Number of sectors     = ',Nsectors
-       write(LOGfile,"(A,"//str(Ns_Ud)//"I8,2X,"//str(Ns_Ud)//"I8,I20)")&
-            'Largest Sector(s)     = ',DimUps,DimDws,product(DimUps)*product(DimDws)
-       write(LOGfile,"(A)")"--------------------------------------------"
-    endif
-    call sleep(1)
+    self%index = isector
     !
+    impDim = 2**(Nimp/Ns_ud)
     !
-    allocate(spH0ups(Ns_Ud))
-    allocate(spH0dws(Ns_Ud))
-    !
-    !Allocate indexing arrays
-    allocate(getCsector(Ns_Ud,2,Nsectors))  ;getCsector  =0
-    allocate(getCDGsector(Ns_Ud,2,Nsectors));getCDGsector=0
-    !
-    allocate(getDim(Nsectors));getDim=0
-    !
-    allocate(getBathStride(Nlat,Norb,Nbath));getBathStride=0
-    allocate(twin_mask(Nsectors))
-    allocate(sectors_mask(Nsectors))
-    allocate(neigen_sector(Nsectors))
-    !
-    !check finiteT
-    finiteT=.true.                    !assume doing finite T per default
-    if(lanc_nstates_total==1)then     !is you only want to keep 1 state
-       finiteT=.false.                !set to do zero temperature calculations
-       write(LOGfile,"(A)")"Required Lanc_nstates_total=1 => set T=0 calculation"
-    endif
-    !
-    !check whether lanc_nstates_sector and lanc_states are even (we do want to keep doublet among states)
-    if(finiteT)then
-       if(mod(lanc_nstates_sector,2)/=0)then
-          lanc_nstates_sector=lanc_nstates_sector+1
-          write(LOGfile,"(A,I10)")"Increased Lanc_nstates_sector:",lanc_nstates_sector
+    select case(ed_mode)
+    case default
+       allocate(self%H(2*Ns_Ud))
+       allocate(self%DimUps(Ns_Ud))
+       allocate(self%DimDws(Ns_Ud))
+       allocate(self%Nups(Ns_Ud))
+       allocate(self%Ndws(Ns_Ud))
+       !
+       call get_Nup(isector,Nups);self%Nup=sum(self%Nups)
+       call get_Ndw(isector,Ndws);self%Ndw=sum(self%Ndws)
+       call get_DimUp(isector,DimUps);self%DimUp=product(self%DimUps)
+       call get_DimDw(isector,DimDws);self%DimDw=product(self%DimDws)
+       !
+       self%Dim = self%DimUp*self%DimDw
+       !
+       if(itrace_)then
+          call map_allocate(H,[self%DimUps,self%DimDws],impDim)
+       else
+          call map_allocate(H,[self%DimUps,self%DimDws])
        endif
-       if(mod(lanc_nstates_total,2)/=0)then
-          lanc_nstates_total=lanc_nstates_total+1
-          write(LOGfile,"(A,I10)")"Increased Lanc_nstates_total:",lanc_nstates_total
-       endif
-       write(LOGfile,"(A)")"Lanczos FINITE temperature calculation:"
        !
-       write(LOGfile,"(A,I3)")"Nstates x Sector = ", lanc_nstates_sector
-       write(LOGfile,"(A,I3)")"Nstates   Total  = ", lanc_nstates_total
-       call sleep(1)
-    else
-       write(LOGfile,"(A)")"Lanczos ZERO temperature calculation:"
-       call sleep(1)
-    endif
-    !
-    Jhflag=.FALSE.
-    if(Norb>1.AND.(Jx/=0d0.OR.Jp/=0d0))Jhflag=.TRUE.
-    !
-    !
-    offdiag_gf_flag=.true.
-    !
-    if(nread/=0.d0)then
-       i=abs(floor(log10(abs(nerr)))) !modulus of the order of magnitude of nerror
-       niter=nloop/3
-    endif
-
-    !ALLOCATE impHloc
-    if(.not.allocated(impHloc))then
-       allocate(impHloc(Nlat,Nlat,Nspin,Nspin,Norb,Norb))
-       impHloc=zero
-    else
-       call assert_shape(impHloc,[Nlat,Nlat,Nspin,Nspin,Norb,Norb],"init_ed_structure","impHloc")
-    endif
-    !
-    !
-    !allocate functions
-    !allocate functions
-    allocate(impSmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impSreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    impSmats=zero
-    impSreal=zero
-    !
-    allocate(impGmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impGreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    impGmats=zero
-    impGreal=zero
-    !
-    !allocate functions
-    allocate(impG0mats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impG0real(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    impG0mats=zero
-    impG0real=zero
-    !
-    !allocate observables
-    allocate(ed_dens(Nlat,Norb),ed_docc(Nlat,Norb),ed_mag(Nlat,Norb),ed_dens_up(Nlat,Norb),ed_dens_dw(Nlat,Norb))
-    ed_dens=0d0
-    ed_docc=0d0
-    ed_mag=0d0
-    ed_dens_up=0d0
-    ed_dens_dw=0d0
-    !
-    ! if(chiflag)then
-    !    allocate(spinChi_tau(Norb+1,0:Ltau))
-    !    allocate(spinChi_w(Norb+1,Lreal))
-    !    allocate(spinChi_iv(Norb+1,0:Lmats))
-    !    !
-    !    ! allocate(densChi_tau(Norb,Norb,0:Ltau))
-    !    ! allocate(densChi_w(Norb,Norb,Lreal))
-    !    ! allocate(densChi_iv(Norb,Norb,0:Lmats))
-    !    ! allocate(densChi_mix_tau(Norb,Norb,0:Ltau))
-    !    ! allocate(densChi_mix_w(Norb,Norb,Lreal))
-    !    ! allocate(densChi_mix_iv(Norb,Norb,0:Lmats))
-    !    ! allocate(densChi_tot_tau(0:Ltau))
-    !    ! allocate(densChi_tot_w(Lreal))
-    !    ! allocate(densChi_tot_iv(0:Lmats))
-    !    ! !
-    !    ! allocate(pairChi_tau(Norb,0:Ltau))
-    !    ! allocate(pairChi_w(Norb,Lreal))
-    !    ! allocate(pairChi_iv(Norb,0:Lmats))
-    ! endif
-    !
-    !allocate density matrices
-    !
-    allocate(single_particle_density_matrix(Nlat,Nlat,Nspin,Nspin,Norb,Norb))
-    single_particle_density_matrix=zero
-    !
-    allocate(cluster_density_matrix(4**Nimp,4**Nimp))
-    cluster_density_matrix=zero
-    !
-  end subroutine init_ed_structure
-
-
-
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE: SETUP THE GLOBAL POINTERS FOR THE ED CALCULAIONS.
-  !+------------------------------------------------------------------+
-  subroutine setup_global
-    integer                          :: DimUp,DimDw
-    integer                          :: DimUps(Ns_Ud),DimDws(Ns_Ud)
-    integer                          :: Indices(2*Ns_Ud),Jndices(2*Ns_Ud)
-    integer                          :: Nups(Ns_ud),Ndws(Ns_ud)
-    integer                          :: Jups(Ns_ud),Jdws(Ns_ud)
-    integer                          :: i,iud,iorb,ilat,stride,ibath
-    integer                          :: isector,jsector
-    integer                          :: unit,status,istate,ishift,isign
-    logical                          :: IOfile
-    integer                          :: list_len
-    integer,dimension(:),allocatable :: list_sector
-    !
-    !Store full dimension of the sectors:
-    do isector=1,Nsectors
-       call get_DimUp(isector,DimUps)
-       call get_DimDw(isector,DimDws)
-       DimUp = product(DimUps)
-       DimDw = product(DimDws)       
-       getDim(isector)  = DimUp*DimDw
-    enddo
-    !
-    !
-    inquire(file="state_list"//reg(ed_file_suffix)//".restart",exist=IOfile)
-    if(IOfile)then
-       write(LOGfile,"(A)")"Restarting from a state_list file:"
-       list_len=file_length("state_list"//reg(ed_file_suffix)//".restart")
-       allocate(list_sector(list_len))
-       !
-       open(free_unit(unit),file="state_list"//reg(ed_file_suffix)//".restart",status="old")
-       status=0
-       do while(status>=0)
-          read(unit,*,iostat=status)istate,isector,indices
-          list_sector(istate)=isector
-          call get_Nup(isector,Nups)
-          call get_Ndw(isector,Ndws)
-          if(any(Indices /= [Nups,Ndws]))&
-               stop "setup_global error: nups!=nups(isector).OR.ndws!=ndws(isector)"
-       enddo
-       close(unit)
-       !
-       lanc_nstates_total = list_len
-       do isector=1,Nsectors
-          neigen_sector(isector) = max(1,count(list_sector==isector))
-       enddo
-    else
-       do isector=1,Nsectors
-          neigen_sector(isector) = min(getDim(isector),lanc_nstates_sector) !init every sector to required eigenstates
-       enddo
-    endif
-    !
-    twin_mask=.true.
-    if(ed_twin)then
-       do isector=1,Nsectors
-          call get_Nup(isector,Nups)
-          call get_Ndw(isector,Ndws)
-          if(any(Nups .ne. Ndws))then
-            call get_Sector([Ndws,Nups],Ns_Orb,jsector)
-            if (twin_mask(jsector))twin_mask(isector)=.false.
-          endif
-       enddo
-       write(LOGfile,"(A,I6,A,I9)")"Looking into ",count(twin_mask)," sectors out of ",Nsectors
-       call sleep(1)
-    endif
-    !
-    stride=Nlat*Norb
-    do ibath=1,Nbath
-       do ilat=1,Nlat
-          do iorb=1,Norb
-             getBathStride(ilat,iorb,ibath) = stride + imp_state_index(ilat,iorb) + (ibath-1)*Nlat*Norb
-             ! getBathStride(ilat,iorb,ibath) = stride + iorb + (ilat-1)*Norb + (ibath-1)*Nlat*Norb
+       do iud=1,Ns_Ud
+          !UP    
+          imap=0
+          do iup=0,2**Ns_Orb-1
+             nup_ = popcnt(iup)  
+             if(nup_ /= Nups(iud))cycle
+             imap  = imap+1
+             self%H(iud)%map(imap) = iup
+             if(.not.itrace_)cycle
+             iIMP  = ibits(iup,0,Nimp)
+             iBATH = ibits(iup,Nimp,Nimp*Nbath)
+             call sp_insert_state(self%H(iud)%sp,iIMP,iBATH,imap) 
+          enddo
+          !DW
+          imap=0
+          do idw=0,2**Ns_Orb-1
+             ndw_= popcnt(idw)
+             if(ndw_ /= Ndws(iud))cycle
+             imap = imap+1
+             self%H(iud+Ns_Ud)%map(imap) = idw
+             if(.not.itrace_)cycle
+             iIMP  = ibits(idw,0,Nimp)
+             iBATH = ibits(idw,Nimp,Nimp*Nbath)
+             call sp_insert_state(self%H(iud+Ns_Ud)%sp,iIMP,iBATH,imap) 
           enddo
        enddo
-    enddo
+       !       
+    case ("superc")
+       allocate(self%H(1))
+       self%Sz  = getSz(isector)
+       self%Dim = getDim(isector)
+       !
+       if(itrace_)then
+          call map_allocate(self%H,[self%Dim],impDim)
+       else
+          call map_allocate(self%H,[self%Dim])
+       endif
+       !
+       imap=0
+       do idw=0,2**Ns-1
+          ndw_= popcnt(idw)
+          do iup=0,2**Ns-1
+             nup_ = popcnt(iup)
+             sz_  = nup_ - ndw_
+             if(sz_ /= self%Sz)cycle
+             imap=imap+1
+             self%H(1)%map(imap) = iup + idw*2**Ns
+             if(.not.itrace_)cycle
+             iIMP  = ibits(iup + idw*2**Ns,0,Nimp)
+             iBATH = ibits(iup + idw*2**Ns,Nimp,Nimp*Nbath)
+             call sp_insert_state(self%H(1)%sp,iIMP,iBATH,imap) 
+          enddo
+       enddo
+
+    end select
     !
-    getCsector  = 0
-    getCDGsector= 0
-    do isector=1,Nsectors
-       call get_Nup(isector,Nups)
-       call get_Ndw(isector,Ndws)
-       !
-       !UPs:
-       !DEL:
-       do iud=1,Ns_Ud
-          Jups=Nups
-          Jdws=Ndws 
-          Jups(iud)=Jups(iud)-1; if(Jups(iud) < 0)cycle
-          call get_Sector([Jups,Jdws],Ns_Orb,jsector)
-          getCsector(iud,1,isector)=jsector
-       enddo
-       !ADD
-       do iud=1,Ns_Ud
-          Jups=Nups
-          Jdws=Ndws
-          Jups(iud)=Jups(iud)+1; if(Jups(iud) > Ns_Orb)cycle
-          call get_Sector([Jups,Jdws],Ns_Orb,jsector)
-          getCDGsector(iud,1,isector)=jsector
-       enddo
-       !
-       !DWs:
-       !DEL
-       do iud=1,Ns_Ud
-          Jups=Nups
-          Jdws=Ndws 
-          Jdws(iud)=Jdws(iud)-1; if(Jdws(iud) < 0)cycle
-          call get_Sector([Jups,Jdws],Ns_Orb,jsector)
-          getCsector(iud,2,isector)=jsector
-       enddo
-       !DEL
-       do iud=1,Ns_Ud
-          Jups=Nups
-          Jdws=Ndws 
-          Jdws(iud)=Jdws(iud)+1; if(Jdws(iud) > Ns_Orb)cycle
-          call get_Sector([Jups,Jdws],Ns_Orb,jsector)
-          getCDGsector(iud,2,isector)=jsector
-       enddo
+  end subroutine build_sector
+
+
+  subroutine delete_sector(self)
+    type(sector) :: self
+    call map_deallocate(self%H)
+    if(allocated(self%H))deallocate(self%H)
+    if(allocated(self%DimUps))deallocate(self%DimUps)
+    if(allocated(self%DimDws))deallocate(self%DimDws)
+    if(allocated(self%Nups))deallocate(self%Nups)
+    if(allocated(self%Ndws))deallocate(self%Ndws)
+    self%index=0
+    self%DimUp=0
+    self%DimDw=0
+    self%Dim=0
+    self%Nup=0
+    self%Ndw=0
+    self%Sz=-1000
+    self%Nlanc=0
+    self%status=.false.
+  end subroutine delete_sector
+
+
+
+
+
+
+
+
+
+
+  !=========================================================
+  subroutine map_allocate_scalar(H,N,Nsp)
+    type(sector_map) :: H
+    integer          :: N
+    integer,optional :: Nsp
+    if(H%status) call map_deallocate_scalar(H)
+    allocate(H%map(N))
+    if(present(Nsp))call sp_init_map(H%sp,Nsp)
+    H%status=.true.
+  end subroutine map_allocate_scalar
+  !
+  subroutine map_allocate_vector(H,N,Nsp)
+    type(sector_map),dimension(:) :: H
+    integer,dimension(size(H))    :: N
+    integer,optional              :: Nsp
+    integer                       :: i
+    do i=1,size(H)
+       if(present(Nsp))then
+          call map_allocate_scalar(H(i),N(i),Nsp)
+       else
+          call map_allocate_scalar(H(i),N(i))
+       endif
     enddo
-    return
-  end subroutine setup_global
+  end subroutine map_allocate_vector
+
+
+  !=========================================================
+  subroutine map_deallocate_scalar(H)
+    type(sector_map) :: H
+    if(.not.H%status)then
+       write(*,*) "WARNING map_deallocate_scalar: H is not allocated"
+       return
+    endif
+    if(allocated(H%map))deallocate(H%map)
+    call sp_delete_map(H%sp)
+    H%status=.false.
+  end subroutine map_deallocate_scalar
+  !
+  subroutine map_deallocate_vector(H)
+    type(sector_map),dimension(:) :: H
+    integer                       :: i
+    do i=1,size(H)
+       call map_deallocate_scalar(H(i))
+    enddo
+  end subroutine map_deallocate_vector
+
+  !=========================================================
+
+
+
+
+
+  ! !> i=instate , j=outstate, ipos=site+orb index, ialfa=?, ispin, sectorI=sector in,sectorJ=sector out
+  ! subroutine apply_op_C(i,j,sgn,ipos,ialfa,ispin,sectorI,sectorJ) 
+  !   integer, intent(in)         :: i,ipos,ialfa,ispin
+  !   type(sector),intent(in)     :: sectorI,sectorJ
+  !   integer,intent(out)         :: j
+  !   real(8),intent(out)         :: sgn
+  !   integer                     :: ibeta,isite
+  !   integer                     :: r
+  !   integer                     :: iph,i_el,j_el,el_state
+  !   integer,dimension(2*Ns_Ud)  :: Indices
+  !   integer,dimension(2*Ns_Ud)  :: Jndices
+  !   integer,dimension(2,Ns_Orb) :: Nud !Nbits(Ns_Orb)
+  !   integer,dimension(2)        :: Iud
+  !   integer,dimension(2*Ns)     :: ib
+  !   !
+  !   j=0
+  !   sgn=0d0
+  !   !
+  !   select case(ed_mode)
+  !   case default
+  !      ibeta  = ialfa + (ispin-1)*Ns_Ud
+  !      iph = (i-1)/(sectorI%DimEl) + 1
+  !      i_el = mod(i-1,sectorI%DimEl) + 1
+  !      !
+  !      call state2indices(i_el,[sectorI%DimUps,sectorI%DimDws],Indices)
+  !      iud(1)   = sectorI%H(ialfa)%map(Indices(ialfa))
+  !      iud(2)   = sectorI%H(ialfa+Ns_Ud)%map(Indices(ialfa+Ns_Ud))
+  !      nud(1,:) = Bdecomp(iud(1),Ns_Orb)
+  !      nud(2,:) = Bdecomp(iud(2),Ns_Orb)
+  !      if(Nud(ispin,ipos)/=1)return
+  !      call c(ipos,iud(ispin),r,sgn)
+  !      Jndices        = Indices
+  !      Jndices(ibeta) = binary_search(sectorJ%H(ibeta)%map,r)
+  !      call indices2state(Jndices,[sectorJ%DimUps,sectorJ%DimDws],j)
+  !      !
+  !      j = j + (iph-1)*sectorJ%DimEl
+  !      !
+  !   case("superc","nonsu2")
+  !      isite= ipos + (ispin-1)*Ns
+  !      iph  = (i-1)/(sectorI%DimEl)+1
+  !      i_el = mod(i-1,sectorI%DimEl)+1
+  !      el_state = sectorI%H(1)%map(i_el)
+  !      ib   = bdecomp(el_state,2*Ns)
+  !      if(ib(isite)/=1)return
+  !      call c(isite,el_state,r,sgn)
+  !      !
+  !      j_el    = binary_search(sectorJ%H(1)%map,r)
+  !      j = j_el + (iph-1)*sectorJ%DimEl
+  !      !
+  !   end select
+  ! end subroutine apply_op_C
+
+
+  ! subroutine apply_op_CDG(i,j,sgn,ipos,ialfa,ispin,sectorI,sectorJ) 
+  !   integer, intent(in)         :: i,ipos,ialfa,ispin
+  !   type(sector),intent(in)     :: sectorI,sectorJ
+  !   integer,intent(out)         :: j
+  !   real(8),intent(out)         :: sgn
+  !   integer                     :: ibeta,isite
+  !   integer                     :: r
+  !   integer                     :: iph,i_el,j_el,el_state
+  !   integer,dimension(2*Ns_Ud)  :: Indices
+  !   integer,dimension(2*Ns_Ud)  :: Jndices
+  !   integer,dimension(2,Ns_Orb) :: Nud !Nbits(Ns_Orb)
+  !   integer,dimension(2)        :: Iud
+  !   integer,dimension(2*Ns)     :: ib
+  !   !
+  !   j=0
+  !   sgn=0d0
+  !   !
+  !   select case(ed_mode)
+  !   case default
+  !      ibeta  = ialfa + (ispin-1)*Ns_Ud
+  !      iph = (i-1)/(sectorI%DimEl) + 1
+  !      i_el = mod(i-1,sectorI%DimEl) + 1
+  !      !
+  !      call state2indices(i_el,[sectorI%DimUps,sectorI%DimDws],Indices)
+  !      iud(1)   = sectorI%H(ialfa)%map(Indices(ialfa))
+  !      iud(2)   = sectorI%H(ialfa+Ns_Ud)%map(Indices(ialfa+Ns_Ud))
+  !      nud(1,:) = Bdecomp(iud(1),Ns_Orb)
+  !      nud(2,:) = Bdecomp(iud(2),Ns_Orb)
+  !      if(Nud(ispin,ipos)/=0)return
+  !      call cdg(ipos,iud(ispin),r,sgn)
+  !      Jndices        = Indices
+  !      Jndices(ibeta) = binary_search(sectorJ%H(ibeta)%map,r)
+  !      call indices2state(Jndices,[sectorJ%DimUps,sectorJ%DimDws],j_el)
+  !      !
+  !      j = j_el + (iph-1)*sectorJ%DimEl
+  !      !
+  !   case("superc","nonsu2")
+  !      isite= ipos + (ispin-1)*Ns
+  !      iph  = (i-1)/(sectorI%DimEl)+1
+  !      i_el = mod(i-1,sectorI%DimEl) + 1
+  !      el_state = sectorI%H(1)%map(i_el)
+  !      ib   = bdecomp(el_state,2*Ns)
+  !      if(ib(isite)/=0)return
+  !      call cdg(isite,el_state,r,sgn)
+  !      !
+  !      j_el    = binary_search(sectorJ%H(1)%map,r)
+  !      j = j_el + (iph-1)*sectorJ%DimEl
+  !      !
+  !   end select
+  ! end subroutine apply_op_CDG
+
+
+  ! subroutine apply_op_Sz(i,sgn,ipos,ialfa,sectorI) 
+  !   integer, intent(in)         :: i,ipos,ialfa
+  !   type(sector),intent(in)     :: sectorI
+  !   real(8),intent(out)         :: sgn
+  !   integer                     :: iph,i_el
+  !   integer,dimension(2*Ns_Ud)  :: Indices
+  !   integer,dimension(2*Ns_Ud)  :: Jndices
+  !   integer,dimension(2,Ns_Orb) :: Nud !Nbits(Ns_Orb)
+  !   integer,dimension(2)        :: Iud
+  !   !
+  !   sgn=0d0
+  !   !
+  !   iph = (i-1)/(sectorI%DimEl) + 1
+  !   i_el = mod(i-1,sectorI%DimEl) + 1
+  !   !
+  !   call state2indices(i_el,[sectorI%DimUps,sectorI%DimDws],Indices)
+  !   iud(1)   = sectorI%H(ialfa)%map(Indices(ialfa))
+  !   iud(2)   = sectorI%H(ialfa+Ns_Ud)%map(Indices(ialfa+Ns_Ud))
+  !   nud(1,:) = Bdecomp(iud(1),Ns_Orb)
+  !   nud(2,:) = Bdecomp(iud(2),Ns_Orb)
+  !   !
+  !   sgn = dble(nud(1,ipos))-dble(nud(2,ipos))
+  !   sgn = sgn/2d0
+  ! end subroutine apply_op_Sz
+
+
+  ! subroutine apply_op_N(i,sgn,ipos,ialfa,sectorI) 
+  !   integer, intent(in)         :: i,ipos,ialfa
+  !   type(sector),intent(in)     :: sectorI
+  !   real(8),intent(out)         :: sgn
+  !   integer                     :: iph,i_el
+  !   integer,dimension(2*Ns_Ud)  :: Indices
+  !   integer,dimension(2*Ns_Ud)  :: Jndices
+  !   integer,dimension(2,Ns_Orb) :: Nud !Nbits(Ns_Orb)
+  !   integer,dimension(2)        :: Iud
+  !   !
+  !   sgn=0d0
+  !   !
+  !   iph = (i-1)/(sectorI%DimEl) + 1
+  !   i_el = mod(i-1,sectorI%DimEl) + 1
+  !   !
+  !   call state2indices(i_el,[sectorI%DimUps,sectorI%DimDws],Indices)
+  !   iud(1)   = sectorI%H(ialfa)%map(Indices(ialfa))
+  !   iud(2)   = sectorI%H(ialfa+Ns_Ud)%map(Indices(ialfa+Ns_Ud))
+  !   nud(1,:) = Bdecomp(iud(1),Ns_Orb)
+  !   nud(2,:) = Bdecomp(iud(2),Ns_Orb)
+  !   !
+  !   sgn = dble(nud(1,ipos))+dble(nud(2,ipos))
+  ! end subroutine apply_op_N
+
+
+  ! subroutine build_op_Ns(i,Nup,Ndw,sectorI) 
+  !   integer, intent(in)             :: i
+  !   type(sector),intent(in)         :: sectorI
+  !   integer,dimension(Ns)           :: Nup,Ndw  ![Ns]
+  !   integer                         :: iph,i_el,ii,iorb
+  !   integer,dimension(2*Ns_Ud)      :: Indices
+  !   integer,dimension(Ns_Ud,Ns_Orb) :: Nups,Ndws  ![1,Ns]-[Norb,1+Nbath]
+  !   integer,dimension(2*Ns)         :: Ib
+  !   integer,dimension(2)            :: Iud
+  !   !
+  !   select case(ed_mode)
+  !   case default
+  !      iph = (i-1)/(sectorI%DimEl) + 1
+  !      i_el = mod(i-1,sectorI%DimEl) + 1
+  !      !
+  !      call state2indices(i_el,[sectorI%DimUps,sectorI%DimDws],Indices)
+  !      do ii=1,Ns_Ud
+  !         iud(1) = sectorI%H(ii)%map(Indices(ii))
+  !         iud(2) = sectorI%H(ii+Ns_Ud)%map(Indices(ii+Ns_ud))
+  !         Nups(ii,:) = Bdecomp(iud(1),Ns_Orb) ![Norb,1+Nbath]
+  !         Ndws(ii,:) = Bdecomp(iud(2),Ns_Orb)
+  !      enddo
+  !      Nup = Breorder(Nups)
+  !      Ndw = Breorder(Ndws)
+  !      !
+  !   case("superc","nonsu2")
+  !      ii = sectorI%H(1)%map(i)
+  !      Ib = bdecomp(ii,2*Ns)
+  !      Nup = Ib(1:Ns)
+  !      Ndw = Ib(Ns+1:)
+  !      ! do ii=1,Ns
+  !      !    Nup(ii)= ib(ii)
+  !      !    Ndw(ii)= ib(ii+Ns)
+  !      ! enddo
+  !   end select
+  !   !
+  ! end subroutine build_op_Ns
 
 
 
@@ -392,47 +487,65 @@ contains
 
 
 
-  !##################################################################
-  !##################################################################
-  !AUXILIARY PROCEDURES - Sectors,Nup,Ndw,DimUp,DimDw,...
-  !##################################################################
-  !##################################################################
-  elemental function get_sector_dimension(n,np) result(dim)
-    integer,intent(in) :: n,np
-    integer            :: dim
-    dim = binomial(n,np)
-  end function get_sector_dimension
 
 
-  subroutine get_Sector(indices,N,isector)
-    integer,dimension(:) :: indices
+
+
+
+
+  subroutine get_Sector_normal(QN,N,isector)
+    integer,dimension(:) :: QN
     integer              :: N
     integer              :: isector
     integer              :: i,Nind,factor
-    Nind = size(indices)
+    Nind = size(QN)
     Factor = N+1
     isector = 1
     do i=Nind,1,-1
-       isector = isector + indices(i)*(Factor)**(Nind-i)
+       isector = isector + QN(i)*(Factor)**(Nind-i)
     enddo
-  end subroutine get_Sector
+  end subroutine get_Sector_normal
+  !
+  subroutine get_Sector_superc(QN,isector)
+    integer :: QN
+    integer :: isector
+    isector=getSector(QN,1)
+  end subroutine get_Sector_superc
 
 
-  subroutine get_Indices(isector,N,indices)
+
+
+  subroutine get_QuantumNumbers_normal(isector,N,QN)
     integer                          :: isector,N
-    integer,dimension(:)             :: indices
+    integer,dimension(:)             :: QN
     integer                          :: i,count,Dim
-    integer,dimension(size(indices)) :: indices_
+    integer,dimension(size(QN)) :: QN_
     !
-    Dim = size(indices)
+    Dim = size(QN)
     if(mod(Dim,2)/=0)stop "get_Indices_main error: Dim%2 != 0"
     count=isector-1
     do i=1,Dim
-       indices_(i) = mod(count,N+1)
+       QN_(i) = mod(count,N+1)
        count      = count/(N+1)
     enddo
-    indices = indices_(Dim:1:-1)
-  end subroutine get_Indices
+    QN = QN_(Dim:1:-1)
+  end subroutine get_QuantumNumbers_normal
+
+  subroutine get_QuantumNumbers_other(isector,QN)
+    integer                     :: isector
+    integer                     :: QN
+    select case(ed_mode)
+    case ("superc")
+       QN=getSz(isector)
+    case default
+       stop "get_QuantumNumbers_other ERROR: invoked with ed_mode=normal"
+    end select
+  end subroutine get_QuantumNumbers_other
+
+
+
+
+
 
 
   subroutine get_Nup(isector,Nup)
@@ -447,7 +560,6 @@ contains
     Nup = indices_(2*Ns_Ud:Ns_Ud+1:-1)
   end subroutine get_Nup
 
-
   subroutine get_Ndw(isector,Ndw)
     integer                   :: isector,Ndw(Ns_Ud)
     integer                   :: i,count
@@ -459,6 +571,16 @@ contains
     enddo
     Ndw = indices_(Ns_Ud:1:-1)
   end subroutine get_Ndw
+
+  subroutine get_Sz(isector,Sz)
+    integer :: isector,Sz
+    Sz = getSz(isector)
+  end subroutine get_Sz
+
+
+
+
+
 
 
   subroutine  get_DimUp(isector,DimUps)
@@ -479,6 +601,18 @@ contains
        DimDws(iud) = binomial(Ns_Orb,Ndws(iud))
     enddo
   end subroutine get_DimDw
+
+  subroutine  get_Dim(isector,Dim)
+    !
+    !Returns the dimension of the symmetry sector with index :f:var:`isector`
+    !
+    integer                :: isector,Dim
+    Dim=getDim(isector)
+  end subroutine get_Dim
+
+
+
+
 
 
   subroutine indices2state(ivec,Nvec,istate)
@@ -528,75 +662,6 @@ contains
 
 
 
-  !######################################################################
-  !######################################################################
-  !BUILD SECTORS: given isector build / delete the corresponding map(s)
-  !######################################################################
-  !######################################################################
-  !
-  subroutine build_sector(isector,H,Itrace)
-    integer                             :: isector
-    type(sector_map),dimension(2*Ns_Ud) :: H
-    logical,optional                    :: itrace
-    logical                             :: itrace_
-    integer,dimension(Ns_Ud)            :: Nups,Ndws
-    integer,dimension(Ns_Ud)            :: DimUps,DimDws
-    integer                             :: DimUp,DimDw,impDIM
-    integer                             :: iup,idw
-    integer                             :: nup_,ndw_
-    integer                             :: imap,iud
-    integer                             :: iIMP,iBATH
-    !
-    itrace_=.false. ; if(present(itrace))itrace_=itrace
-    !
-    impDIM = 2**(Nimp/Ns_ud)
-    !
-    call get_Nup(isector,Nups)
-    call get_Ndw(isector,Ndws)
-    call get_DimUp(isector,DimUps)
-    call get_DimDw(isector,DimDws)
-    !
-    if(itrace_)then
-       call map_allocate(H,[DimUps,DimDws],impDIM)
-    else
-       call map_allocate(H,[DimUps,DimDws])
-    endif
-    !
-    do iud=1,Ns_Ud
-       !UP    
-       imap=0
-       do iup=0,2**Ns_Orb-1
-          nup_ = popcnt(iup)  
-          if(nup_ /= Nups(iud))cycle
-          imap = imap+1
-          H(iud)%map(imap) = iup
-          if(.not.itrace_)cycle
-          iIMP  = ibits(iup,0,Nimp)
-          iBATH = ibits(iup,Nimp,Nimp*Nbath)
-          call sp_insert_state(H(iud)%sp,iIMP,iBATH,imap) 
-       enddo
-       !DW
-       imap=0
-       do idw=0,2**Ns_Orb-1
-          ndw_= popcnt(idw)
-          if(ndw_ /= Ndws(iud))cycle
-          imap = imap+1
-          H(iud+Ns_Ud)%map(imap) = idw
-          if(.not.itrace_)cycle
-          iIMP  = ibits(idw,0,Nimp)
-          iBATH = ibits(idw,Nimp,Nimp*Nbath)
-          call sp_insert_state(H(iud+Ns_Ud)%sp,iIMP,iBATH,imap) 
-       enddo
-    enddo
-    !
-  end subroutine build_sector
-
-
-  subroutine delete_sector(isector,H)
-    integer                   :: isector
-    type(sector_map)          :: H(:)
-    call map_deallocate(H)
-  end subroutine delete_sector
 
 
 
@@ -622,25 +687,30 @@ contains
   subroutine twin_sector_order(isector,order)
     integer                             :: isector
     integer,dimension(:)                :: order
+    type(sector)                        :: sectorH
     type(sector_map),dimension(2*Ns_Ud) :: H
     integer,dimension(2*Ns_Ud)          :: Indices,Istates
     integer,dimension(Ns_Ud)            :: DimUps,DimDws
     integer                             :: Dim
     integer                             :: i,iud
     !
-    Dim = GetDim(isector)
     if(size(Order)/=Dim)stop "twin_sector_order error: wrong dimensions of *order* array"
-    call get_DimUp(isector,DimUps)
-    call get_DimDw(isector,DimDws)
     !
-    call build_sector(isector,H)
-    do i=1,Dim
-       call state2indices(i,[DimUps,DimDws],Indices)
-       forall(iud=1:2*Ns_Ud)Istates(iud) = H(iud)%map(Indices(iud))
-       Order(i) = flip_state( Istates )
-    enddo
-    call delete_sector(isector,H)
+    call build_sector(isector,sectorH)
+    select case(ed_mode)
+    case ("normal")
+       do i=1,sectorH%Dim
+          call state2indices(i,[sectorH%DimUps,sectorH%DimDws],Indices)
+          forall(iud=1:2*Ns_Ud)Istates(iud) = sectorH%H(iud)%map(Indices(iud))
+          Order(i) = flip_state( Istates )
+       enddo
+    case default
+       do i=1,sectorH%dim
+          Order(i) = flip_state(sectorH%H(1)%map(i))
+       enddo
+    end select
     !
+    call delete_sector(sectorH)
     call sort_array(Order)
     !
   end subroutine twin_sector_order
@@ -652,7 +722,7 @@ contains
   !
   ! normal: j=|{dw}>|{up}>  , nup --> ndw
   !+------------------------------------------------------------------+
-  function flip_state(istate) result(j)
+  function flip_state_normal(istate) result(j)
     integer,dimension(2*Ns_Ud) :: istate
     integer                    :: j
     integer,dimension(Ns_Ud)   :: jups,jdws
@@ -663,7 +733,24 @@ contains
     dims = 2**Ns_Orb
     call indices2state([jups,jdws],Dims,j)
     !
-  end function flip_state
+  end function flip_state_normal
+  function flip_state_other(istate) result(j)
+    integer          :: istate
+    integer          :: j
+    integer          :: ivec(2*Ns),foo(2*Ns)
+    !
+    Ivec = bdecomp(istate,2*Ns)
+    select case(ed_mode)
+    case("superc")  !Invert the overall spin sign: |{up}> <---> |{dw}>
+       foo(1:Ns)     = Ivec(Ns+1:2*Ns)
+       foo(Ns+1:2*Ns)= Ivec(1:Ns)
+    case default    !Exchange UP-config |{up}> with DW-config |{dw}>
+       stop "flip_state_other error: called with ed_mode==normal"
+    end select
+    !
+    j = bjoin(foo,2*Ns)
+    !
+  end function flip_state_other
 
 
   !+------------------------------------------------------------------+
@@ -675,9 +762,17 @@ contains
     integer,intent(in)       :: isector
     integer                  :: jsector
     integer,dimension(Ns_Ud) :: Iups,Idws
-    call get_Nup(isector,iups)
-    call get_Ndw(isector,idws)
-    call get_Sector([idws,iups],Ns_Orb,jsector)
+    integer                  :: Sz
+    select case(ed_mode)
+    case default
+       call get_Nup(isector,iups)
+       call get_Ndw(isector,idws)
+       call get_Sector([idws,iups],Ns_Orb,jsector)
+    case ("superc")
+       call get_Sz(isector,Sz)
+       Sz = -Sz
+       call get_Sector(Sz,jsector)
+    end select
   end function get_twin_sector
 
 
@@ -694,50 +789,6 @@ contains
   !AUXILIARY COMPUTATIONAL ROUTINES ARE HERE BELOW:
   !##################################################################
   !##################################################################
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : calculate the factorial of an integer N!=1.2.3...(N-1).N
-  !+------------------------------------------------------------------+
-  recursive function factorial(n) result(f)
-    integer            :: f
-    integer,intent(in) :: n
-    if(n<=0)then
-       f=1
-    else
-       f=n*factorial(n-1)
-    end if
-  end function factorial
-
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : calculate the binomial factor n1 over n2
-  !+------------------------------------------------------------------+
-  elemental function binomial(n1,n2) result(nchoos)
-    integer,intent(in) :: n1,n2
-    real(8)            :: xh
-    integer            :: i
-    integer nchoos
-    xh = 1.d0
-    if(n2<0) then
-       nchoos = 0
-       return
-    endif
-    if(n2==0) then
-       nchoos = 1
-       return
-    endif
-    do i = 1,n2
-       xh = xh*dble(n1+1-i)/dble(i)
-    enddo
-    nchoos = int(xh + 0.5d0)
-  end function binomial
-
-
-
-
-
-
   !+------------------------------------------------------------------+
   !PURPOSE : sort array of integer using random algorithm
   !+------------------------------------------------------------------+
@@ -798,7 +849,39 @@ contains
 
 
 
-end MODULE ED_SETUP
+
+
+
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : calculate the binomial factor n1 over n2
+  !+------------------------------------------------------------------+
+  elemental function binomial(n1,n2) result(nchoos)
+    integer,intent(in) :: n1,n2
+    real(8)            :: xh
+    integer            :: i
+    integer nchoos
+    xh = 1.d0
+    if(n2<0) then
+       nchoos = 0
+       return
+    endif
+    if(n2==0) then
+       nchoos = 1
+       return
+    endif
+    do i = 1,n2
+       xh = xh*dble(n1+1-i)/dble(i)
+    enddo
+    nchoos = int(xh + 0.5d0)
+  end function binomial
+
+
+
+
+
+end MODULE ED_SECTOR
 
 
 
