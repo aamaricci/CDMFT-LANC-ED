@@ -16,15 +16,15 @@ MODULE ED_VARS_GLOBAL
   !-------------------- H EXPANSION STRUCTURE ----------------------!
   type H_operator
      ! The matrix storing in the basis [:f:var:`nlat` , :f:var:`nlat` , :f:var:`nspin` , :f:var:`nspin` , :f:var:`norb` , :f:var:`norb` ] each element of the Matrix basis decomposing the replica/general bath Hamiltonian :math:`H_p=\sum_{i=1}^{N_{basis}} \lambda_i(p) O_i`, where :math:`N_{basis}` is the dimension of the user defined basis.  
-     complex(8),dimension(:,:,:,:,:,:),allocatable   :: O  !Bath hamiltonian (replica/general)
+     complex(8),dimension(:,:,:,:,:,:),allocatable           :: O  !Bath hamiltonian (replica/general)
   end type H_operator
 
 
   !-------------------- EFFECTIVE BATH STRUCTURE ----------------------!
   type effective_bath_component
      ! Effective bath component for the replica/general bath. Each istance of this type defines the parameters :math:`\vec{\lambda}` and the amplitudes :math:`\vec{V}`. The first is used to decompose the Hamiltonian of each element of the bath :math:`H_p=\sum_{i=1}^{N_{basis}} \lambda_i(p) O_i`, the latter describes the hopping from/to the impurity.
-     real(8),dimension(:),allocatable :: v      ![1] for "replica" bath; [Nbath] for "general" bath
-     real(8),dimension(:),allocatable :: lambda ![:f:var:`nsym`]
+     real(8),dimension(:),allocatable                        :: v      ![1] for "replica" bath; [Nbath] for "general" bath
+     real(8),dimension(:),allocatable                        :: lambda ![:f:var:`nsym`]
   end type effective_bath_component
 
   type effective_bath
@@ -37,9 +37,9 @@ MODULE ED_VARS_GLOBAL
 
   !-------------------- CUSTOM OBSERVABLE STRUCTURE ----------------------!
   type observable
-     complex(8),dimension(:,:,:),allocatable :: sij
-     character(len=32)                       :: o_name
-     real(8)                                 :: o_value
+     complex(8),dimension(:,:,:),allocatable                 :: sij
+     character(len=32)                                       :: o_name
+     real(8)                                                 :: o_value
   end type observable
 
   type custom_observables
@@ -53,27 +53,27 @@ MODULE ED_VARS_GLOBAL
 
   !---------------- SECTOR-TO-FOCK SPACE STRUCTURE -------------------!
   type sector_map
-     integer,dimension(:),allocatable :: map
-     type(sparse_map)                 :: sp
-     logical                          :: status=.false.
+     integer,dimension(:),allocatable                        :: map
+     type(sparse_map)                                        :: sp
+     logical                                                 :: status=.false.
   end type sector_map
 
 
   type sector
-     integer                                   :: index       !
-     type(sector_map),dimension(:),allocatable :: H
-     integer,dimension(:),allocatable          :: DimUps
-     integer,dimension(:),allocatable          :: DimDws
-     integer                                   :: DimUp
-     integer                                   :: DimDw
-     integer                                   :: Dim
-     integer,dimension(:),allocatable          :: Nups
-     integer,dimension(:),allocatable          :: Ndws
-     integer                                   :: Nup
-     integer                                   :: Ndw
-     integer                                   :: Sz
-     integer                                   :: Nlanc
-     logical                                   :: status=.false.
+     integer                                                 :: index       !
+     type(sector_map),dimension(:),allocatable               :: H
+     integer,dimension(:),allocatable                        :: DimUps
+     integer,dimension(:),allocatable                        :: DimDws
+     integer                                                 :: DimUp
+     integer                                                 :: DimDw
+     integer                                                 :: Dim
+     integer,dimension(:),allocatable                        :: Nups
+     integer,dimension(:),allocatable                        :: Ndws
+     integer                                                 :: Nup
+     integer                                                 :: Ndw
+     integer                                                 :: Sz
+     integer                                                 :: Nlanc
+     logical                                                 :: status=.false.
   end type sector
 
 
@@ -81,19 +81,19 @@ MODULE ED_VARS_GLOBAL
 
   type GFspectrum
      !The contributions to the GF Kallen-Lehmann sum are stored as :math:`G_{ab,sr}.state.channel.[w,e]`. A couple of weight,poles :math:`[w,e]` is stored for each *channel*, corresponding to c,cdg or any their combination thereof as well as for any state :math:`|n\rangle` of the spectrum such that :math:`G(z) = \sum \frac{w}{z-e}`
-     complex(8),dimension(:),allocatable :: weight
-     complex(8),dimension(:),allocatable :: poles
+     complex(8),dimension(:),allocatable                     :: weight
+     complex(8),dimension(:),allocatable                     :: poles
   end type GFspectrum
 
 
-  
+
   type GFchannel
-     type(GFspectrum),dimension(:),allocatable :: channel !N_channel = 2 (c,cdag), 4 (c,cdag,c pm cdag)
+     type(GFspectrum),dimension(:),allocatable               :: channel !N_channel = 2 (c,cdag), 4 (c,cdag,c pm cdag)
   end type GFchannel
 
-  
+
   type GFmatrix
-     type(GFchannel),dimension(:),allocatable :: state !state_list%size = # of state in the spectrum 
+     type(GFchannel),dimension(:),allocatable                :: state !state_list%size = # of state in the spectrum 
   end type GFmatrix
 
 
@@ -159,86 +159,87 @@ MODULE ED_VARS_GLOBAL
 
   !SIZE OF THE PROBLEM
   !=========================================================
-  integer,save                                       :: Ns       !Number of levels per spin
-  integer,save                                       :: Nsectors !Number of sectors
-  integer,save                                       :: Ns_orb
-  integer,save                                       :: Ns_ud
+  integer,save                                           :: Ns       !Number of levels per spin
+  integer,save                                           :: Nsectors !Number of sectors
+  integer,save                                           :: Ns_orb
+  integer,save                                           :: Ns_ud
   !
-  integer                                            :: Nimp     !Total number of levels in the impurity cluster: Nlat*Norb
-  ! integer                                            :: Nlso     !Nlat*Nspin*Norb
-
+  integer                                                :: Nimp     !Total number of levels in the impurity cluster: Nlat*Norb
+  ! integer                                              :: Nlso     !Nlat*Nspin*Norb
+  !Global Nambu factor for SC calculations (Nspin=1 but this index is 2 to
+  !correctly allocate  Nambu arrays of dim 2*Norb) 
+  !=========================================================
+  integer                                                :: Nnambu=1
+  integer                                                :: Nns
 
   !Some maps between sectors and full Hilbert space (pointers)
   !PRIVATE:
   !=========================================================
-  integer,allocatable,dimension(:)                   :: getDim             ! [Nsectors]
-  integer,allocatable,dimension(:,:,:)               :: getCsector         ! [1/Norb,2,NSectors]
-  integer,allocatable,dimension(:,:,:)               :: getCDGsector       ! [1/Norb,2,NSectors]
-  integer,allocatable,dimension(:,:,:)               :: getBathStride
-  integer,allocatable,dimension(:,:)                 :: impIndex
-  logical,allocatable,dimension(:)                   :: twin_mask
-  logical,allocatable,dimension(:)                   :: sectors_mask
-  integer,allocatable,dimension(:,:)                 :: getSector
-  integer,allocatable,dimension(:)                   :: getSz
-  integer,allocatable,dimension(:)                   :: getN
+  integer,allocatable,dimension(:)                       :: getDim             ! [Nsectors]
+  integer,allocatable,dimension(:,:,:)                   :: getCsector         ! [1/Norb,2,NSectors]
+  integer,allocatable,dimension(:,:,:)                   :: getCDGsector       ! [1/Norb,2,NSectors]
+  integer,allocatable,dimension(:,:,:)                   :: getBathStride
+  integer,allocatable,dimension(:,:)                     :: impIndex
+  logical,allocatable,dimension(:)                       :: twin_mask
+  logical,allocatable,dimension(:)                       :: sectors_mask
+  integer,allocatable,dimension(:,:)                     :: getSector
+  integer,allocatable,dimension(:)                       :: getSz
+  integer,allocatable,dimension(:)                       :: getN
 
 
   !Effective Bath used in the ED code (this is opaque to user)
   !PRIVATE
   !=========================================================
-  type(effective_bath)                               :: dmft_bath !instance of :f:var:`effective_bath` used to store the quantum impurity effective bath in the rest of the code 
+  type(effective_bath)                                   :: dmft_bath !instance of :f:var:`effective_bath` used to store the quantum impurity effective bath in the rest of the code 
 
 
 
-  !Global Nambu factor for SC calculations (Nspin=1 but this index is 2 to
-  !correctly allocate  Nambu arrays of dim 2*Norb) 
-  !=========================================================
-  integer                                            :: Nnambu=1
 
-  type(H_operator),dimension(:),allocatable             :: Hbath_basis  ![Nsym]
-  real(8),dimension(:,:),allocatable                    :: Hbath_lambda ![Nbath,Nsym]
-  logical                                               :: Hbath_status=.false.
-  !Replica/General bath basis set
-  !=========================================================
-  type(H_operator),dimension(:),allocatable          :: Hreplica_basis   ![Nsym]
-  real(8),dimension(:,:),allocatable                 :: Hreplica_lambda  ![Nbath,Nsym]
-  logical                                            :: Hreplica_status=.false.
-  !
-  type(H_operator),dimension(:),allocatable          :: Hgeneral_basis   ![Nsym]
-  real(8),dimension(:,:),allocatable                 :: Hgeneral_lambda  ![Nbath,Nsym]
-  logical                                            :: Hgeneral_status=.false.
+
+  type(H_operator),dimension(:),allocatable              :: Hbath_basis  ![Nsym]
+  real(8),dimension(:,:),allocatable                     :: Hbath_lambda ![Nbath,Nsym]
+  logical                                                :: Hbath_status=.false.
+  ! !Replica/General bath basis set
+  ! !=========================================================
+  ! type(H_operator),dimension(:),allocatable              :: Hreplica_basis   ![Nsym]
+  ! real(8),dimension(:,:),allocatable                     :: Hreplica_lambda  ![Nbath,Nsym]
+  ! logical                                                :: Hreplica_status=.false.
+  ! !
+  ! type(H_operator),dimension(:),allocatable              :: Hgeneral_basis   ![Nsym]
+  ! real(8),dimension(:,:),allocatable                     :: Hgeneral_lambda  ![Nbath,Nsym]
+  ! logical                                                :: Hgeneral_status=.false.
 
 
   !local part of the Hamiltonian
   !INTERNAL USE (accessed thru functions)
   !=========================================================
-  complex(8),dimension(:,:,:,:,:,:),allocatable         :: impHloc           !local hamiltonian [Nlat][Nlat][Nspin][Nspin][Norb][Norb]
+  complex(8),dimension(:,:,:,:,:,:),allocatable          :: impHloc           !local hamiltonian [Nlat][Nlat][Nspin][Nspin][Norb][Norb]
 
 
 
   !Variables for DIAGONALIZATION
   !PRIVATE
   !=========================================================  
-  type(sparse_matrix_csr)                            :: spH0d !diagonal part
-  type(sparse_matrix_csr)                            :: spH0nd !non-diagonal part
-  type(sparse_matrix_csr),dimension(:),allocatable   :: spH0ups,spH0dws !reduced UP and DW parts
+  type(sparse_matrix_csr)                                :: spH0d !diagonal part
+  type(sparse_matrix_csr)                                :: spH0nd !non-diagonal part
+  type(sparse_matrix_csr),dimension(:),allocatable       :: spH0ups,spH0dws !reduced UP and DW parts
   !
-  procedure(cc_sparse_HxV),pointer                   :: spHtimesV_p=>null()
+  procedure(cc_sparse_HxV),pointer                       :: spHtimesV_p=>null()
 
 
   !Variables for DIAGONALIZATION
   !PRIVATE
   !=========================================================  
-  integer,allocatable,dimension(:)                   :: neigen_sector
-  logical                                            :: trim_state_list=.false.
+  integer,allocatable,dimension(:)                       :: neigen_sector
+  logical                                                :: trim_state_list=.false.
 
 
   !Partition function
   !PRIVATE
   !=========================================================
-  real(8)                                            :: zeta_function
-  real(8)                                            :: gs_energy
-  real(8)                                            :: max_exc
+  real(8)                                                :: zeta_function
+  real(8)                                                :: gs_energy
+  real(8)                                                :: max_exc
 
 
 
@@ -247,21 +248,21 @@ MODULE ED_VARS_GLOBAL
   !Impurity Green's function and Self-Energies: (Nlat,Nlat,Nspin,Nspin,Norb,Norb,:)
   !PRIVATE (now public but accessible thru routine)
   !=========================================================
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)   :: impGmats
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)   :: impGreal
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)   :: impG0mats
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)   :: impG0real
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)   :: impSmats 
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)   :: impSreal
+  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impGmats
+  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impGreal
+  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impG0mats
+  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impG0real
+  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSmats 
+  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSreal
   !
-  complex(8),allocatable,dimension(:,:,:,:,:)       :: impSAmats
-  complex(8),allocatable,dimension(:,:,:,:,:)       :: impSAreal
-  complex(8),allocatable,dimension(:,:,:,:,:)       :: impFmats
-  complex(8),allocatable,dimension(:,:,:,:,:)       :: impFreal
-  complex(8),allocatable,dimension(:,:,:,:,:)       :: impF0mats
-  complex(8),allocatable,dimension(:,:,:,:,:)       :: impF0real
+  complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAmats
+  complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAreal
+  complex(8),allocatable,dimension(:,:,:,:,:)            :: impFmats
+  complex(8),allocatable,dimension(:,:,:,:,:)            :: impFreal
+  complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0mats
+  complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0real
   !
-  type(GFmatrix),allocatable,dimension(:,:,:,:,:,:) :: impGmatrix
+  type(GFmatrix),allocatable,dimension(:,:,:,:,:,:)      :: impGmatrix
 
 
 
@@ -271,24 +272,24 @@ MODULE ED_VARS_GLOBAL
   !Local energies and generalized double occupancies
   !PRIVATE (now public but accessible thru routines)
   !=========================================================
-  real(8),dimension(:,:),allocatable                   ::  ed_dens
-  real(8),dimension(:,:),allocatable                   ::  ed_dens_up,ed_dens_dw
-  real(8),dimension(:,:),allocatable                   ::  ed_docc
-  real(8),dimension(:,:),allocatable                   ::  ed_mag
-  real(8)                                               :: ed_Epot
-  real(8)                                               :: ed_Eint
-  real(8)                                               :: ed_Ehartree
-  real(8)                                               :: ed_Eknot
-  real(8)                                               :: ed_Dust
-  real(8)                                               :: ed_Dund
-  real(8)                                               :: ed_Dse
-  real(8)                                               :: ed_Dph
-  type(custom_observables)                             ::  custom_o
+  real(8),dimension(:,:),allocatable                     :: ed_dens
+  real(8),dimension(:,:),allocatable                     :: ed_dens_up,ed_dens_dw
+  real(8),dimension(:,:),allocatable                     :: ed_docc
+  real(8),dimension(:,:),allocatable                     :: ed_mag
+  real(8)                                                :: ed_Epot
+  real(8)                                                :: ed_Eint
+  real(8)                                                :: ed_Ehartree
+  real(8)                                                :: ed_Eknot
+  real(8)                                                :: ed_Dust
+  real(8)                                                :: ed_Dund
+  real(8)                                                :: ed_Dse
+  real(8)                                                :: ed_Dph
+  type(custom_observables)                               :: custom_o
 
 
   !Frequency and time arrays:
   !=========================================================
-  real(8),dimension(:),allocatable                   :: wm,tau,wr,vm,vr
+  real(8),dimension(:),allocatable                       :: wm,tau,wr,vm,vr
 
 
 
@@ -303,38 +304,14 @@ MODULE ED_VARS_GLOBAL
 
 
 
-#if __GFORTRAN__ &&  __GNUC__ > 8     
-  !--------------- LATTICE WRAP VARIABLES -----------------!
-  ! [Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb(,:)]
-  complex(8),dimension(:,:,:,:,:,:,:),allocatable,save   :: Hloc_ineq
-  complex(8),dimension(:,:,:,:,:,:,:,:),allocatable,save :: Smats_ineq,Sreal_ineq 
-  complex(8),dimension(:,:,:,:,:,:,:,:),allocatable,save :: SAmats_ineq,SAreal_ineq
-  complex(8),dimension(:,:,:,:,:,:,:,:),allocatable,save :: Gmats_ineq,Greal_ineq
-  complex(8),dimension(:,:,:,:,:,:,:,:),allocatable,save :: Fmats_ineq,Freal_ineq
-  complex(8),dimension(:,:,:,:,:,:,:,:),allocatable,save :: G0mats_ineq,G0real_ineq
-  complex(8),dimension(:,:,:,:,:,:,:,:),allocatable,save :: F0mats_ineq,F0real_ineq
-  complex(8),dimension(:,:,:,:,:,:,:),allocatable,save   :: single_particle_density_matrix_ineq 
-  complex(8),dimension(:,:,:),allocatable,save           :: cluster_density_matrix_ineq ![Nineq,4**(Nlat*Norb),4**(Nlat*Norb)]
-  real(8),dimension(:,:,:),allocatable,save              :: dens_ineq 
-  real(8),dimension(:,:,:),allocatable,save              :: docc_ineq
-  real(8),dimension(:,:,:),allocatable,save              :: mag_ineq
-  real(8),dimension(:,:,:,:),allocatable,save            :: phisc_ineq
-  real(8),dimension(:,:),allocatable,save                :: dd_ineq,e_ineq
-  integer,allocatable,dimension(:,:)                     :: neigen_sector_ineq
-  integer,allocatable,dimension(:)                       :: neigen_total_ineq
-  real(8),dimension(:,:,:),allocatable                   :: Hbath_lambda_ineq 
-  real(8),dimension(:,:,:),allocatable                   :: Hreplica_lambda_ineq
-  real(8),dimension(:,:,:),allocatable                   :: Hgeneral_lambda_ineq
-#endif
-
 
   !File suffixes for printing fine tuning.
   !=========================================================
-  character(len=32)                                  :: ed_file_suffix=""
-  character(len=10)                                  :: ineq_site_suffix="_ineq"
-  integer                                            :: site_indx_padding=4
-  logical                                            :: Jhflag  
-  logical                                            :: offdiag_gf_flag=.false.
+  character(len=32)                                      :: ed_file_suffix=""
+  character(len=10)                                      :: indx_suffix="_indx"
+  integer                                                :: indx_padding=4
+  logical                                                :: Jhflag  
+  logical                                                :: offdiag_gf_flag=.false.
 
 
 
@@ -342,26 +319,26 @@ MODULE ED_VARS_GLOBAL
   !This is the internal Mpi Communicator and variables.
   !=========================================================
 #ifdef _MPI
-  integer                                            :: MpiComm_Global=MPI_COMM_NULL
-  integer                                            :: MpiComm=MPI_COMM_NULL
+  integer                                                :: MpiComm_Global=MPI_COMM_NULL
+  integer                                                :: MpiComm=MPI_COMM_NULL
 #endif
-  integer                                            :: MpiGroup_Global=MPI_GROUP_NULL
-  integer                                            :: MpiGroup=MPI_GROUP_NULL
-  logical                                            :: MpiStatus=.false.
-  logical                                            :: MpiMaster=.true.
-  integer                                            :: MpiRank=0
-  integer                                            :: MpiSize=1
-  integer,allocatable,dimension(:)                   :: MpiMembers
-  integer                                            :: mpiQup=0
-  integer                                            :: mpiRup=0
-  integer                                            :: mpiQdw=0
-  integer                                            :: mpiRdw=0
-  integer                                            :: mpiQ=0
-  integer                                            :: mpiR=0
-  integer                                            :: mpiIstart
-  integer                                            :: mpiIend
-  integer                                            :: mpiIshift
-  logical                                            :: mpiAllThreads=.true.
+  integer                                                :: MpiGroup_Global=MPI_GROUP_NULL
+  integer                                                :: MpiGroup=MPI_GROUP_NULL
+  logical                                                :: MpiStatus=.false.
+  logical                                                :: MpiMaster=.true.
+  integer                                                :: MpiRank=0
+  integer                                                :: MpiSize=1
+  integer,allocatable,dimension(:)                       :: MpiMembers
+  integer                                                :: mpiQup=0
+  integer                                                :: mpiRup=0
+  integer                                                :: mpiQdw=0
+  integer                                                :: mpiRdw=0
+  integer                                                :: mpiQ=0
+  integer                                                :: mpiR=0
+  integer                                                :: mpiIstart
+  integer                                                :: mpiIend
+  integer                                                :: mpiIshift
+  logical                                                :: mpiAllThreads=.true.
 
 
 

@@ -21,16 +21,10 @@ MODULE ED_AUX_FUNX
      !The local hamiltonian can have different shapes:
      !
      !   * [ |Nlso|  , |Nlso| ]: single-cluster case, rank-2
-     !   * [ |Nineq| , |Nlso| , |Nlso| ]: real-space CDMFT case, rank-3
      !   * [ |Nlat|  , |Nlat| , |Nspin| , |Nspin| , |Norb|  , |Norb| ]: single-cluster case, rank-6
-     !   * [ |Nineq| , |Nlat| , |Nlat|  , |Nspin| , |Nspin| , |Norb| , |Norb| ]: real-space RDMFT case, rank-7
-     !
-     !In the case of real-space CDMFT, the number of impurities |Nineq| must be provided.
      !
      module procedure :: ed_set_Hloc_single_N2
      module procedure :: ed_set_Hloc_single_N6
-     module procedure :: ed_set_Hloc_lattice_N3
-     module procedure :: ed_set_Hloc_lattice_N7
   end interface ed_set_Hloc
 
 
@@ -81,23 +75,6 @@ MODULE ED_AUX_FUNX
   end interface ed_set_suffix
 
 
-  ! #if __GNUC__ > 6
-  !   interface read(unformatted)
-  !      module procedure :: read_unformatted
-  !   end interface read(unformatted)
-
-  !   interface write(unformatted)
-  !      module procedure :: write_unformatted
-  !   end interface write(unformatted)
-
-  !   interface read(formatted)
-  !      module procedure :: read_formatted
-  !   end interface read(formatted)
-
-  !   interface write(formatted)
-  !      module procedure :: write_formatted
-  !   end interface write(formatted)
-  ! #endif
 
 
 
@@ -182,15 +159,15 @@ contains
 
   subroutine ed_set_suffix_i(indx)
     integer :: indx
-    ed_file_suffix=reg(ineq_site_suffix)//str(indx,site_indx_padding)
+    ed_file_suffix=reg(indx_suffix)//str(indx,indx_padding)
   end subroutine ed_set_suffix_i
   subroutine ed_set_suffix_d(indx)
     real(8) :: indx
-    ed_file_suffix=reg(ineq_site_suffix)//str(indx)
+    ed_file_suffix=reg(indx_suffix)//str(indx)
   end subroutine ed_set_suffix_d
   subroutine ed_set_suffix_c(indx)
     character(len=*) :: indx
-    ed_file_suffix=reg(ineq_site_suffix)//str(indx)
+    ed_file_suffix=reg(indx_suffix)//str(indx)
   end subroutine ed_set_suffix_c
 
 
@@ -233,29 +210,6 @@ contains
     if(ed_verbose>2)call print_hloc(impHloc)
   end subroutine ed_set_Hloc_single_N6
 
-  subroutine ed_set_Hloc_lattice_N3(hloc,Nineq)
-    complex(8),dimension(:,:,:),intent(in) :: hloc
-    integer                                :: Nineq,isite
-    !
-    if(allocated(Hloc_ineq))deallocate(Hloc_ineq)
-    allocate(Hloc_ineq(Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb));Hloc_ineq=zero
-    !
-    call assert_shape(Hloc,[Nineq,Nlat*Nspin*Norb,Nlat*Nspin*Norb],"ed_set_Hloc","Hloc")
-    do isite=1,Nineq
-       Hloc_ineq(isite,:,:,:,:,:,:)  = lso2nnn_reshape(Hloc(isite,:,:),Nlat,Nspin,Norb)
-    enddo
-  end subroutine ed_set_Hloc_lattice_N3
-
-  subroutine ed_set_Hloc_lattice_N7(hloc,Nineq)
-    complex(8),dimension(:,:,:,:,:,:,:),intent(in) :: hloc
-    integer                                :: Nineq,isite
-    !
-    if(allocated(Hloc_ineq))deallocate(Hloc_ineq)
-    allocate(Hloc_ineq(Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb));Hloc_ineq=zero
-    !
-    call assert_shape(Hloc,[Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb],"ed_set_Hloc","Hloc")
-    Hloc_ineq = Hloc
-  end subroutine ed_set_Hloc_lattice_N7
 
 
 

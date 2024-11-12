@@ -72,10 +72,14 @@ contains
     select case(ed_mode)
     case default
        Nsectors = ((Ns_Orb+1)*(Ns_Orb+1))**Ns_Ud
+       Nnambu   = 1
     case ("superc")
        Nsectors = Nlevels+1     !sz=-Ns:Ns=2*Ns+1=Nlevels+1
+       Nnambu   = 2 ; Nspin = 1
     end select
-
+    !
+    Nns = Nnambu*Nspin
+    !
   end subroutine ed_setup_dimensions
 
 
@@ -226,7 +230,7 @@ contains
     impF0mats=zero
     impF0real=zero
     !
-    allocate(impGmatrix(Nlat,Nlat,Nnambu*Nspin,Nnambu*Nspin,Norb,Norb))
+    allocate(impGmatrix(Nlat,Nlat,Nns,Nns,Norb,Norb))
     !
     !allocate observables
     allocate(ed_dens(Nlat,Norb))

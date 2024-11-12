@@ -10,86 +10,86 @@ MODULE ED_INPUT_VARS
 
   !input variables
   !=========================================================
-  integer(c_int), bind(c, name="Nlat")                               :: Nlat                !Number of cluster sites
-  integer(c_int), bind(c, name="Norb")                               :: Norb                !Number of impurity orbitals
-  integer(c_int), bind(c, name="Nspin")                              :: Nspin               !Number spin degeneracy (max 2)
-  integer(c_int), bind(c, name="Nbath")                              :: Nbath               !Number of bath sites (per orbital or not depending on bath_type)
+  integer(c_int), bind(c, name="Nlat")             :: Nlat                !Number of cluster sites
+  integer(c_int), bind(c, name="Norb")             :: Norb                !Number of impurity orbitals
+  integer(c_int), bind(c, name="Nspin")            :: Nspin               !Number spin degeneracy (max 2)
+  integer(c_int), bind(c, name="Nbath")            :: Nbath               !Number of bath sites (per orbital or not depending on bath_type)
 
 
-  integer(c_int), bind(c, name="Nloop")                              :: Nloop               !max dmft loop variables
-  real(c_double),dimension(5),bind(c, name="Uloc")                   :: Uloc                !local interactions
-  real(c_double),bind(c, name="Ust")                                 :: Ust                 !intra-orbitals interactions
-  real(c_double),bind(c, name="Jh")                                  :: Jh                  !J_Hund: Hunds' coupling constant 
-  real(c_double),bind(c, name="Jx")                                  :: Jx                  !J_X: coupling constant for the spin-eXchange interaction term
-  real(c_double),bind(c, name="Jp")                                  :: Jp                  !J_P: coupling constant for the Pair-hopping interaction term 
-  real(c_double),bind(c, name="xmu")                                 :: xmu                 !chemical potential
-  real(c_double),bind(c, name="beta")                                :: beta                !inverse temperature
+  integer(c_int), bind(c, name="Nloop")            :: Nloop               !max dmft loop variables
+  real(c_double),dimension(5),bind(c, name="Uloc") :: Uloc                !local interactions
+  real(c_double),bind(c, name="Ust")               :: Ust                 !intra-orbitals interactions
+  real(c_double),bind(c, name="Jh")                :: Jh                  !J_Hund: Hunds' coupling constant 
+  real(c_double),bind(c, name="Jx")                :: Jx                  !J_X: coupling constant for the spin-eXchange interaction term
+  real(c_double),bind(c, name="Jp")                :: Jp                  !J_P: coupling constant for the Pair-hopping interaction term 
+  real(c_double),bind(c, name="xmu")               :: xmu                 !chemical potential
+  real(c_double),bind(c, name="beta")              :: beta                !inverse temperature
 
-  integer(c_int), bind(c, name="Nsuccess")                           :: Nsuccess            !Number of repeated success to fall below convergence threshold  
-  real(c_double),bind(c, name="dmft_error")                          :: dmft_error          !dmft convergence threshold
-  real(c_double),bind(c, name="eps")                                 :: eps                 !broadening
-  real(c_double),bind(c, name="wini")                                :: wini                !frequency range min
-  real(c_double),bind(c, name="wfin")                                :: wfin                !frequency range max
-  real(c_double),bind(c, name="sb_field")                            :: sb_field            !symmetry breaking field
-  real(c_double),bind(c, name="nread")                               :: nread               !fixed density. if 0.d0 fixed chemical potential calculation.
-  logical(c_bool),bind(c, name="ed_twin")                            :: ed_twin             !flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.
-  logical                                                            :: ed_twin_
+  integer(c_int), bind(c, name="Nsuccess")         :: Nsuccess            !Number of repeated success to fall below convergence threshold  
+  real(c_double),bind(c, name="dmft_error")        :: dmft_error          !dmft convergence threshold
+  real(c_double),bind(c, name="eps")               :: eps                 !broadening
+  real(c_double),bind(c, name="wini")              :: wini                !frequency range min
+  real(c_double),bind(c, name="wfin")              :: wfin                !frequency range max
+  real(c_double),bind(c, name="sb_field")          :: sb_field            !symmetry breaking field
+  real(c_double),bind(c, name="nread")             :: nread               !fixed density. if 0.d0 fixed chemical potential calculation.
+  logical(c_bool),bind(c, name="ed_twin")          :: ed_twin             !flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.
+  logical                                          :: ed_twin_
 
 
-  logical              :: chiflag             !
-  logical              :: gf_flag             !flag to evaluate Green's functions (and related quantities)
-  logical              :: dm_flag             !flag to evaluate the cluster density matrix \rho_IMP = Tr_BATH(\rho)) 
-  logical              :: HFmode              !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
-  real(8)              :: cutoff              !cutoff for spectral summation
-  real(8)              :: gs_threshold        !Energy threshold for ground state degeneracy loop up
-  real(8)              :: deltasc             !breaking symmetry field
-  real(8)              :: dmft_error          !dmft convergence threshold
+  logical                                          :: chiflag             !
+  logical                                          :: gf_flag             !flag to evaluate Green's functions (and related quantities)
+  logical                                          :: dm_flag             !flag to evaluate the cluster density matrix \rho_IMP = Tr_BATH(\rho)) 
+  logical                                          :: HFmode              !flag for HF interaction form U(n-1/2)(n-1/2) VS Unn
+  real(8)                                          :: cutoff              !cutoff for spectral summation
+  real(8)                                          :: gs_threshold        !Energy threshold for ground state degeneracy loop up
+  real(8)                                          :: deltasc             !breaking symmetry field
+  real(8)                                          :: dmft_error          !dmft convergence threshold
 
-  character(len=7)     :: ed_mode             !flag to set ed symmetry type: normal=normal (default), superc=superconductive, nonsu2=broken SU(2)
-  logical              :: ed_finite_temp      !flag to select finite temperature method. note that if T then lanc_nstates_total must be > 1 
-  logical              :: ed_sparse_H         !flag to select  storage of sparse matrix H (mem--, cpu++) if TRUE, or direct on-the-fly H*v product (mem++, cpu--
-  logical              :: ed_gf_symmetric     !flag to assume G_ij = G_ji
-  logical              :: ed_print_Sigma      !flag to print impurity Self-energies
-  logical              :: ed_print_G          !flag to print impurity Green`s functions
-  logical              :: ed_print_G0         !flag to print impurity non-interacting Green`s functions
-  logical              :: ed_sectors          !flag to reduce sector scan for the spectrum to specific sectors +/- ed_sectors_shift
-  integer              :: ed_sectors_shift    !shift to the ed_sectors scan
-  integer              :: ed_verbose          !
-  real(8)              :: ed_offset_bath      !half-bandwidth for the bath initialization: flat in -hwband:hwband
-  real(8)              :: ed_hw_band              !half-bandwidth for the bath initialization (diagonal part in Hbath)
+  character(len=7)                                 :: ed_mode             !flag to set ed symmetry type: normal=normal (default), superc=superconductive, nonsu2=broken SU(2)
+  logical                                          :: ed_finite_temp      !flag to select finite temperature method. note that if T then lanc_nstates_total must be > 1 
+  logical                                          :: ed_sparse_H         !flag to select  storage of sparse matrix H (mem--, cpu++) if TRUE, or direct on-the-fly H*v product (mem++, cpu--
+  logical                                          :: ed_gf_symmetric     !flag to assume G_ij = G_ji
+  logical                                          :: ed_print_Sigma      !flag to print impurity Self-energies
+  logical                                          :: ed_print_G          !flag to print impurity Green`s functions
+  logical                                          :: ed_print_G0         !flag to print impurity non-interacting Green`s functions
+  logical                                          :: ed_sectors          !flag to reduce sector scan for the spectrum to specific sectors +/- ed_sectors_shift
+  integer                                          :: ed_sectors_shift    !shift to the ed_sectors scan
+  integer                                          :: ed_verbose          !
+  real(8)                                          :: ed_offset_bath      !half-bandwidth for the bath initialization: flat in -hwband:hwband
+  real(8)                                          :: ed_hw_band              !half-bandwidth for the bath initialization (diagonal part in Hbath)
 
-  character(len=12)    :: lanc_method         !select the lanczos method to be used in the determination of the spectrum. ARPACK (default), LANCZOS (T=0 only) 
-  real(8)              :: lanc_tolerance      !Tolerance for the Lanczos iterations as used in Arpack and plain lanczos. 
-  integer              :: lanc_niter          !Max number of Lanczos iterations
-  integer              :: lanc_ngfiter        !Max number of iteration in resolvant tri-diagonalization
-  integer              :: lanc_ncv_factor     !Set the size of the block used in Lanczos-Arpack by multiplying the required Neigen (Ncv=lanc_ncv_factor*Neigen+lanc_ncv_add)
-  integer              :: lanc_ncv_add        !Adds up to the size of the block to prevent it to become too small (Ncv=lanc_ncv_factor*Neigen+lanc_ncv_add)
-  integer              :: lanc_nstates_sector !Max number of required eigenvalues per sector
-  integer              :: lanc_nstates_total  !Max number of states hold in the finite T calculation
-  integer              :: lanc_nstates_step   !Number of states added at each step to determine the optimal spectrum size at finite T
-  integer              :: lanc_dim_threshold  !Min dimension threshold to use Lanczos determination of the spectrum rather than Lapack based exact diagonalization.
+  character(len=12)                                :: lanc_method         !select the lanczos method to be used in the determination of the spectrum. ARPACK (default), LANCZOS (T=0 only) 
+  real(8)                                          :: lanc_tolerance      !Tolerance for the Lanczos iterations as used in Arpack and plain lanczos. 
+  integer                                          :: lanc_niter          !Max number of Lanczos iterations
+  integer                                          :: lanc_ngfiter        !Max number of iteration in resolvant tri-diagonalization
+  integer                                          :: lanc_ncv_factor     !Set the size of the block used in Lanczos-Arpack by multiplying the required Neigen (Ncv=lanc_ncv_factor*Neigen+lanc_ncv_add)
+  integer                                          :: lanc_ncv_add        !Adds up to the size of the block to prevent it to become too small (Ncv=lanc_ncv_factor*Neigen+lanc_ncv_add)
+  integer                                          :: lanc_nstates_sector !Max number of required eigenvalues per sector
+  integer                                          :: lanc_nstates_total  !Max number of states hold in the finite T calculation
+  integer                                          :: lanc_nstates_step   !Number of states added at each step to determine the optimal spectrum size at finite T
+  integer                                          :: lanc_dim_threshold  !Min dimension threshold to use Lanczos determination of the spectrum rather than Lapack based exact diagonalization.
   !
-  character(len=5)     :: cg_scheme           !fit scheme: delta (default) or weiss for G0and
+  character(len=5)                                 :: cg_scheme           !fit scheme: delta (default) or weiss for G0and
 
-  integer              :: cg_method           !fit routine type:0=CGnr (default), 1=minimize (old f77)
-  integer              :: cg_grad             !gradient evaluation: 0=analytic, 1=numeric
-  integer              :: cg_niter            !Max number of iteration in the fit
-  real(8)              :: cg_ftol             !Tolerance in the cg fit
-  integer              :: cg_stop             !fit stop condition:0-3, 0=C1.AND.C2, 1=C1, 2=C2 with C1=|F_n-1 -F_n|<tol*(1+F_n), C2=||x_n-1 -x_n||<tol*(1+||x_n||).
-  integer              :: cg_matrix           !fit weights for matrix elements: for now flat or 'spectral' (normalized according to \sum_iw A(iw))
-  integer              :: cg_weight           !fit weights on matsubara axis: 0=1, 1=1/n , 2=1/w_n
-  integer              :: cg_pow              !fit power to generalize the distance as |G0 - G0and|**cg_pow
-  character(len=9)     :: cg_norm             !fit norm: elemental (default) or frobenius norm to evaluate distances |G0 - G0and|
-  logical              :: cg_minimize_ver     !flag to pick old (Krauth) or new (Lichtenstein) version of the minimize CG routine
-  real(8)              :: cg_minimize_hh      !unknown parameter used in the CG minimize procedure.  
+  integer                                          :: cg_method           !fit routine type:0=CGnr (default), 1=minimize (old f77)
+  integer                                          :: cg_grad             !gradient evaluation: 0=analytic, 1=numeric
+  integer                                          :: cg_niter            !Max number of iteration in the fit
+  real(8)                                          :: cg_ftol             !Tolerance in the cg fit
+  integer                                          :: cg_stop             !fit stop condition:0-3, 0=C1.AND.C2, 1=C1, 2=C2 with C1=|F_n-1 -F_n|<tol*(1+F_n), C2=||x_n-1 -x_n||<tol*(1+||x_n||).
+  integer                                          :: cg_matrix           !fit weights for matrix elements: for now flat or 'spectral' (normalized according to \sum_iw A(iw))
+  integer                                          :: cg_weight           !fit weights on matsubara axis: 0=1, 1=1/n , 2=1/w_n
+  integer                                          :: cg_pow              !fit power to generalize the distance as |G0 - G0and|**cg_pow
+  character(len=9)                                 :: cg_norm             !fit norm: elemental (default) or frobenius norm to evaluate distances |G0 - G0and|
+  logical                                          :: cg_minimize_ver     !flag to pick old (Krauth) or new (Lichtenstein) version of the minimize CG routine
+  real(8)                                          :: cg_minimize_hh      !unknown parameter used in the CG minimize procedure.  
   !
-  logical              :: finiteT             !flag for finite temperature calculation (UNIMPLEMENTED: hard-linked to lanc_nstates_total=1)
-  character(len=7)     :: bath_type           !bath representation choice (here either "replica" or "general")
+  logical                                          :: finiteT             !flag for finite temperature calculation (UNIMPLEMENTED: hard-linked to lanc_nstates_total=1)
+  character(len=7)                                 :: bath_type           !bath representation choice (here either "replica" or "general")
   !
-  real(8)              :: nerr                !fix density threshold. a loop over from 1.d-1 to required nerr is performed
-  real(8)              :: ndelta              !initial chemical potential step
-  real(8)              :: ncoeff              !multiplier for the initial ndelta read from a file (ndelta-->ndelta*ncoeff)
-  integer              :: niter               !
+  real(8)                                          :: nerr                !fix density threshold. a loop over from 1.d-1 to required nerr is performed
+  real(8)                                          :: ndelta              !initial chemical potential step
+  real(8)                                          :: ncoeff              !multiplier for the initial ndelta read from a file (ndelta-->ndelta*ncoeff)
+  integer                                          :: niter               !
 
   !Some parameters for function dimension:
   !=========================================================
@@ -102,13 +102,13 @@ MODULE ED_INPUT_VARS
 
   !LOG AND Hamiltonian UNITS
   !=========================================================
-  character(len=100)   :: Hfile  !File where to retrieve/store the bath parameters.
-  character(len=100)   :: HLOCfile !File read the input local H
-  character(len=100)   :: SectorFile !File where to retrieve/store the sectors contributing to the spectrum
-  integer(c_int),bind(c, name="LOGfile"),save             :: LOGfile  !Logfile unit
+  character(len=100)                               :: Hfile  !File where to retrieve/store the bath parameters.
+  character(len=100)                               :: HLOCfile !File read the input local H
+  character(len=100)                               :: SectorFile !File where to retrieve/store the sectors contributing to the spectrum
+  integer(c_int),bind(c, name="LOGfile"),save      :: LOGfile  !Logfile unit
 
   !THIS IS JUST A RELOCATED GLOBAL VARIABLE
-  character(len=200)                                 :: ed_input_file="" !Name of input file
+  character(len=200)                               :: ed_input_file="" !Name of input file
 
 
 
