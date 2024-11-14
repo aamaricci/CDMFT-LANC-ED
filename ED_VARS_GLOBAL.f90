@@ -15,7 +15,7 @@ MODULE ED_VARS_GLOBAL
 
   !-------------------- H EXPANSION STRUCTURE ----------------------!
   type H_operator
-     ! The matrix storing in the basis [:f:var:`nlat` , :f:var:`nlat` , :f:var:`nspin` , :f:var:`nspin` , :f:var:`norb` , :f:var:`norb` ] each element of the Matrix basis decomposing the replica/general bath Hamiltonian :math:`H_p=\sum_{i=1}^{N_{basis}} \lambda_i(p) O_i`, where :math:`N_{basis}` is the dimension of the user defined basis.  
+     ! The matrix storing in the basis [:f:var:`nambu` , :f:var:`nambu` , :f:var:`nspin` , :f:var:`nspin` , :f:var:`nimp` , :f:var:`nimp` ] each element of the Matrix basis decomposing the replica/general bath Hamiltonian :math:`H_p=\sum_{i=1}^{N_{basis}} \lambda_i(p) O_i`, where :math:`N_{basis}` is the dimension of the user defined basis.  
      complex(8),dimension(:,:,:,:,:,:),allocatable           :: O  !Bath hamiltonian (replica/general)
   end type H_operator
 
@@ -165,12 +165,10 @@ MODULE ED_VARS_GLOBAL
   integer,save                                           :: Ns_ud
   !
   integer                                                :: Nimp     !Total number of levels in the impurity cluster: Nlat*Norb
-  ! integer                                              :: Nlso     !Nlat*Nspin*Norb
-  !Global Nambu factor for SC calculations (Nspin=1 but this index is 2 to
-  !correctly allocate  Nambu arrays of dim 2*Norb) 
-  !=========================================================
-  integer                                                :: Nnambu=1
-  integer                                                :: Nns
+  integer                                                :: Nlso     !Nspin*Nimp
+  integer                                                :: Nambu   !Global Nambu factor for SC calculations
+  integer                                                :: Ntot     !Nambu*Nspin*Nlat*Norb
+  
 
   !Some maps between sectors and full Hilbert space (pointers)
   !PRIVATE:
@@ -199,21 +197,12 @@ MODULE ED_VARS_GLOBAL
   type(H_operator),dimension(:),allocatable              :: Hbath_basis  ![Nsym]
   real(8),dimension(:,:),allocatable                     :: Hbath_lambda ![Nbath,Nsym]
   logical                                                :: Hbath_status=.false.
-  ! !Replica/General bath basis set
-  ! !=========================================================
-  ! type(H_operator),dimension(:),allocatable              :: Hreplica_basis   ![Nsym]
-  ! real(8),dimension(:,:),allocatable                     :: Hreplica_lambda  ![Nbath,Nsym]
-  ! logical                                                :: Hreplica_status=.false.
-  ! !
-  ! type(H_operator),dimension(:),allocatable              :: Hgeneral_basis   ![Nsym]
-  ! real(8),dimension(:,:),allocatable                     :: Hgeneral_lambda  ![Nbath,Nsym]
-  ! logical                                                :: Hgeneral_status=.false.
 
 
   !local part of the Hamiltonian
   !INTERNAL USE (accessed thru functions)
   !=========================================================
-  complex(8),dimension(:,:,:,:,:,:),allocatable          :: impHloc           !local hamiltonian [Nlat][Nlat][Nspin][Nspin][Norb][Norb]
+  complex(8),dimension(:,:,:,:),allocatable              :: impHloc           !local hamiltonian [Nspin][Nspin][Nimp][Nimp]
 
 
 
@@ -245,7 +234,7 @@ MODULE ED_VARS_GLOBAL
 
 
 
-  !Impurity Green's function and Self-Energies: (Nlat,Nlat,Nspin,Nspin,Norb,Norb,:)
+  !Impurity Green's function and Self-Energies: (Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,:)
   !PRIVATE (now public but accessible thru routine)
   !=========================================================
   complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impGmats
@@ -255,12 +244,12 @@ MODULE ED_VARS_GLOBAL
   complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSmats 
   complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSreal
   !
-  complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAmats
-  complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAreal
-  complex(8),allocatable,dimension(:,:,:,:,:)            :: impFmats
-  complex(8),allocatable,dimension(:,:,:,:,:)            :: impFreal
-  complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0mats
-  complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0real
+  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAmats
+  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAreal
+  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impFmats
+  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impFreal
+  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0mats
+  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0real
   !
   type(GFmatrix),allocatable,dimension(:,:,:,:,:,:)      :: impGmatrix
 
@@ -270,12 +259,12 @@ MODULE ED_VARS_GLOBAL
 
   !Density and double occupancy
   !Local energies and generalized double occupancies
-  !PRIVATE (now public but accessible thru routines)
+  !PRIVATE accessible thru routines)
   !=========================================================
-  real(8),dimension(:,:),allocatable                     :: ed_dens
-  real(8),dimension(:,:),allocatable                     :: ed_dens_up,ed_dens_dw
-  real(8),dimension(:,:),allocatable                     :: ed_docc
-  real(8),dimension(:,:),allocatable                     :: ed_mag
+  real(8),dimension(:),allocatable                       :: ed_dens
+  real(8),dimension(:),allocatable                       :: ed_dens_up,ed_dens_dw
+  real(8),dimension(:),allocatable                       :: ed_docc
+  real(8),dimension(:),allocatable                       :: ed_mag
   real(8)                                                :: ed_Epot
   real(8)                                                :: ed_Eint
   real(8)                                                :: ed_Ehartree
@@ -297,8 +286,8 @@ MODULE ED_VARS_GLOBAL
   !Impurity operators
   !PRIVATE (now public but accessible thru routine)
   !=========================================================
-  complex(8),allocatable,dimension(:,:,:,:,:,:)          :: single_particle_density_matrix ![Nlat,Nlat,Nspin,Nspin,Norb,Norb]
-  complex(8),allocatable,dimension(:,:)                  :: cluster_density_matrix         ![4**(Nlat*Norb),4**(Nlat*Norb)]
+  complex(8),allocatable,dimension(:,:,:,:,:,:)          :: single_particle_density_matrix ![Nambu,Nambu,Nspin,Nspin,Nimp,Nimp]
+  complex(8),allocatable,dimension(:,:)                  :: cluster_density_matrix         ![4**(Nimp),4**(Nimp)]
 
 
 

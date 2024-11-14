@@ -32,7 +32,6 @@ contains
     !
     if(ed_mode=="superc")then
        if(Nspin>1)stop "ED ERROR: SC + Magnetism is not yet supported"
-       ! if(bath_type=="replica")stop "ED ERROR: ed_mode=SUPERC + bath_type=replica is not supported"
     endif
     !
     if(Nspin>1.AND.ed_twin.eqv..true.)then
@@ -63,22 +62,23 @@ contains
   !+------------------------------------------------------------------+
   subroutine ed_setup_dimensions()
     !
-    Nimp = Nlat*Norb    !Total number of levels in the impurity cluster
-    Ns = Nimp*(Nbath+1) !Total number of levels per spin
+    Nimp   = Nlat*Norb    !Total number of levels in the impurity cluster
     !
+    Ns     = Nimp*(Nbath+1) !Total number of levels per spin
     Ns_Orb = Ns
     Ns_Ud  = 1
     !
     select case(ed_mode)
     case default
        Nsectors = ((Ns_Orb+1)*(Ns_Orb+1))**Ns_Ud
-       Nnambu   = 1
+       Nambu    = 1
     case ("superc")
-       Nsectors = Nlevels+1     !sz=-Ns:Ns=2*Ns+1=Nlevels+1
-       Nnambu   = 2 ; Nspin = 1
+       Nsectors = Nlevels+1
+       Nambu    = 2
     end select
     !
-    Nns = Nnambu*Nspin
+    Nlso   = Nspin*Nimp
+    Ntot   = Nambu*Nspin*Nimp
     !
   end subroutine ed_setup_dimensions
 
@@ -194,59 +194,59 @@ contains
 
     !ALLOCATE impHloc
     if(.not.allocated(impHloc))then
-       allocate(impHloc(Nlat,Nlat,Nspin,Nspin,Norb,Norb))
+       allocate(impHloc(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp))
        impHloc=zero
     else
-       call assert_shape(impHloc,[Nlat,Nlat,Nspin,Nspin,Norb,Norb],"init_ed_structure","impHloc")
+       call assert_shape(impHloc,[Nambu,Nambu,Nspin,Nspin,Nimp,Nimp],"init_ed_structure","impHloc")
     endif
     !
     !
     !allocate functions
-    allocate(impSmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impSreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    allocate(impSAmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impSAreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    impSAmats=zero
-    impSAreal=zero
+    allocate(impSmats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
+    allocate(impSreal(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
+    ! allocate(impSAmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
+    ! allocate(impSAreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
+    ! impSAmats=zero
+    ! impSAreal=zero
     impSmats=zero
     impSreal=zero
     !
-    allocate(impGmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impGreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    allocate(impFmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impFreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
+    allocate(impGmats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
+    allocate(impGreal(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
+    ! allocate(impFmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
+    ! allocate(impFreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
     impGmats=zero
     impGreal=zero
-    impFmats=zero
-    impFreal=zero
+    ! impFmats=zero
+    ! impFreal=zero
     !
     !allocate functions
-    allocate(impG0mats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impG0real(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    allocate(impF0mats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    allocate(impF0real(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
+    allocate(impG0mats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
+    allocate(impG0real(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
+    ! allocate(impF0mats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
+    ! allocate(impF0real(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
     impG0mats=zero
     impG0real=zero
-    impF0mats=zero
-    impF0real=zero
+    ! impF0mats=zero
+    ! impF0real=zero
     !
-    allocate(impGmatrix(Nlat,Nlat,Nns,Nns,Norb,Norb))
+    allocate(impGmatrix(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp))
     !
     !allocate observables
-    allocate(ed_dens(Nlat,Norb))
-    allocate(ed_docc(Nlat,Norb))
-    allocate(ed_mag(Nlat,Norb))
-    allocate(ed_phisc(Nlat,Norb))
-    allocate(ed_dens_up(Nlat,Norb),ed_dens_dw(Nlat,Norb))
-    ed_dens=0d0
-    ed_docc=0d0
-    ed_mag=0d0
-    ed_phisc=0d0
-    ed_dens_up=0d0
-    ed_dens_dw=0d0
+    allocate(ed_dens(Nimp))
+    allocate(ed_docc(Nimp))
+    allocate(ed_mag(Nimp))
+    allocate(ed_phisc(Nimp))
+    allocate(ed_dens_up(Nimp),ed_dens_dw(Nimp))
+    ed_dens   = 0d0
+    ed_docc   = 0d0
+    ed_mag    = 0d0
+    ed_phisc  = 0d0
+    ed_dens_up= 0d0
+    ed_dens_dw= 0d0
     !
     !
-    allocate(single_particle_density_matrix(Nlat,Nlat,Nspin,Nspin,Norb,Norb))
+    allocate(single_particle_density_matrix(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp))
     single_particle_density_matrix=zero
     !
     allocate(cluster_density_matrix(4**Nimp,4**Nimp))
@@ -287,16 +287,16 @@ contains
     if(allocated(impHloc))deallocate(impHloc)
     if(allocated(impSmats))deallocate(impSmats)
     if(allocated(impSreal))deallocate(impSreal)
-    if(allocated(impSAmats))deallocate(impSAmats)
-    if(allocated(impSAreal))deallocate(impSAreal)
+    ! if(allocated(impSAmats))deallocate(impSAmats)
+    ! if(allocated(impSAreal))deallocate(impSAreal)
     if(allocated(impGmats))deallocate(impGmats)
     if(allocated(impGreal))deallocate(impGreal)
-    if(allocated(impFmats))deallocate(impFmats)
-    if(allocated(impFreal))deallocate(impFreal)
+    ! if(allocated(impFmats))deallocate(impFmats)
+    ! if(allocated(impFreal))deallocate(impFreal)
     if(allocated(impG0mats))deallocate(impG0mats)
     if(allocated(impG0real))deallocate(impG0real)
-    if(allocated(impF0mats))deallocate(impF0mats)
-    if(allocated(impF0real))deallocate(impF0real)
+    ! if(allocated(impF0mats))deallocate(impF0mats)
+    ! if(allocated(impF0real))deallocate(impF0real)
     if(allocated(impGmatrix))deallocate(impGmatrix)
     if(allocated(ed_dens))deallocate(ed_dens)
     if(allocated(ed_docc))deallocate(ed_docc)
