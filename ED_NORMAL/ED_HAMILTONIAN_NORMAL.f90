@@ -1,30 +1,21 @@
-MODULE ED_HAMILTONIAN
-  USE ED_HAMILTONIAN_COMMON
-  USE ED_HAMILTONIAN_SPARSE_HxV
-  USE ED_HAMILTONIAN_DIRECT_HxV
+MODULE ED_HAMILTONIAN_NORMAL
+  !Setup and build the sector Hamiltonian, returns the correct dimension of the vectors in the Arpack/Lanczos procedure in each thread and provides an interface to Tri-Diagonalize the Hamiltonian on a Krylov basis given a starting vector.
+  !
+  USE ED_HAMILTONIAN_NORMAL_COMMON
+  USE ED_HAMILTONIAN_NORMAL_STORED_HxV
+  USE ED_HAMILTONIAN_NORMAL_DIRECT_HxV
   !
   implicit none
   private
 
 
   !>Build sparse hamiltonian of the sector
-  public  :: build_Hv_sector
-  public  :: delete_Hv_sector
-  public  :: vecDim_Hv_sector
+  public  :: build_Hv_sector_normal
+  public  :: delete_Hv_sector_normal
+  public  :: vecDim_Hv_sector_normal
 
-  !>Sparse Mat-Vec product using stored sparse matrix
-  public  :: spMatVec_main
-#ifdef _MPI
-  public  :: spMatVec_MPI_main
-#endif
-
-
-  !>Sparse Mat-Vec direct on-the-fly product 
-  public  :: directMatVec_main
-#ifdef _MPI
-  public  :: directMatVec_MPI_main
-#endif
-
+  !> Tridiag sparse Hamiltonian of the sector
+  public  :: tridiag_Hv_sector_normal
 
 
 
@@ -36,9 +27,34 @@ contains
   !####################################################################
   !                 MAIN ROUTINES: BUILD/DELETE SECTOR
   !####################################################################
-  subroutine build_Hv_sector(isector,Hmat)
-    integer                            :: isector,SectorDim
-    complex(8),dimension(:,:),optional :: Hmat   
+  subroutine build_Hv_sector_normal(isector,Hmat)
+    !
+    ! Builds the matrix-vector product :math:`H\times \vec{v}` in the current sector.
+    !
+    !   #. Building the sector through :f:func:`build_sector` for :f:var:`isector`
+    !   #. Retrieve all dimensions of the sectors, setup the MPI split in parallel mode.
+    !   #. If total sector dimension is < :f:var:`lanc_dim_threshold` then Hamiltonian is stored into dense matrix for Lapack diagonalization
+    !   #. Else we proceeds according to the followins scheme:
+    !
+    !.. list-table                     :: Build Hamiltonian, :math:`H\times\vec{v}` products.
+    !    :widths: auto
+    !    :header-rows: 1
+    !    :stub-columns: 1
+    !
+    !    * - 
+    !      - :f:var:`ed_sparse_H` = :code:`T`
+    !      - :f:var:`ed_sparse_H` = :code:`F`
+    !
+    !    * - :f:var:`ed_total_ud` = :code:`T`
+    !      - | call :f:func:`ed_buildh_normal_main`
+    !        | serial: :f:func:`sphtimesv_p` :code:`=>` :f:func:`spmatvec_normal_main` 
+    !        | MPI:    :f:func:`sphtimesv_p` :code:`=>` :f:func:`spmatvec_mpi_normal_main`
+    !      - | serial: :f:func:`sphtimesv_p` :code:`=>` :f:func:`directmatvec_normal_main` 
+    !        | MPI:    :f:func:`sphtimesv_p` :code:`=>` :f:func:`directmatvec_mpi_normal_main`
+    !
+    !
+    integer                            :: isector !Index of the actual sector to be analyzed
+    complex(8),dimension(:,:),optional :: Hmat    !Dense matrix to store the sector Hamiltonian is dim < :f:var:`lanc_dim_threshold`
     integer                            :: irank,ierr
     integer                            :: i,iup,idw
     integer                            :: j,jup,jdw
@@ -47,16 +63,20 @@ contains
     Hstatus=.true.
     !
     allocate(Hs(2*Ns_Ud))
+
+    call build_sector(isector,Hsector)
+    !
     allocate(DimUps(Ns_Ud))
     allocate(DimDws(Ns_Ud))
-    call build_sector(isector,Hs)
+    Dim    = Hsector%Dim
+    DimUp  = Hsector%DimUp
+    DimDw  = Hsector%DimDw
+    DimUps = Hsector%DimUps
+    DimDws = Hsector%DimDws
     !
-    call get_DimUp(isector,DimUps)
-    call get_DimDw(isector,DimDws)
-    DimUp = product(DimUps)
-    DimDw = product(DimDws)
-    Dim   = getDim(isector)
-    !
+    !#################################
+    !          MPI SETUP
+    !#################################
     mpiAllThreads=.true.
     !>PREAMBLE: check that split of the DW is performed with the minimum #cpu: no idle cpus allowed (with zero elements)
 #ifdef _MPI
@@ -120,40 +140,48 @@ contains
 #endif
     !
     !
+    !#################################
+    !          HxV SETUP
+    !#################################
     if(present(Hmat))then
        spHtimesV_p => null()
-       call ed_buildh_main(isector,Hmat)          
+       call ed_buildh_normal_main(Hmat)          
        return
     endif
     !
     select case (ed_sparse_H)
     case (.true.)
-       spHtimesV_p => spMatVec_main
+       spHtimesV_p => spMatVec_normal_main
 #ifdef _MPI
-       if(MpiStatus)spHtimesV_p => spMatVec_MPI_main
+       if(MpiStatus)spHtimesV_p => spMatVec_MPI_normal_main
 #endif
-       call ed_buildh_main(isector)
+       call ed_buildh_normal_main()
     case (.false.)
-       spHtimesV_p => directMatVec_main
+       spHtimesV_p => directMatVec_normal_main
 #ifdef _MPI
-       if(MpiStatus)spHtimesV_p => directMatVec_MPI_main
+       if(MpiStatus)spHtimesV_p => directMatVec_MPI_normal_main
 #endif
     end select
     !
-  end subroutine build_Hv_sector
+  end subroutine build_Hv_sector_normal
 
 
 
 
 
   subroutine delete_Hv_sector()
+    !
+    ! Delete the all the memory used to construct the sector Hamiltonian and the corresponding matrix vector products.
+    ! The sector is deleted, all the dimensions and MPI splitting variables are reset to zero. All the sparse matrices are deallocated having gone out of scope. The abstract interface pointer :f:var:`spHtimesV_p` for the matrix-vector product is nullified. 
+    !
     integer :: iud,ierr,i
-    call delete_sector(Hsector,Hs)
-    deallocate(Hs)
+    call delete_sector(Hsector)
     deallocate(DimUps)
-    deallocate(DimDws)    
-    Hsector=0
-    Hstatus=.false.
+    deallocate(DimDws)
+    Dim    = 0
+    DimUp  = 0
+    DimDw  = 0
+    !
     !
     !There is no difference here between Mpi and serial version, as Local part was removed.
 #ifdef _MPI
@@ -182,7 +210,15 @@ contains
        MpiComm = MpiComm_Global
        MpiSize = get_Size_MPI(MpiComm_Global)
        MpiRank = get_Rank_MPI(MpiComm_Global)
-       !call Mpi_Comm_Dup(MpiComm_Global,MpiComm,ierr)
+       mpiQup=0
+       mpiRup=0
+       mpiQdw=0
+       mpiRdw=0
+       mpiQ=0
+       mpiR=0
+       mpiIstart=0
+       mpiIend=0
+       mpiIshift=0
     endif
 #endif
     iter=0
@@ -194,9 +230,12 @@ contains
 
 
 
-  function vecDim_Hv_sector(isector) result(vecDim)
-    integer :: isector
-    integer :: vecDim
+  function vecDim_Hv_sector_normal(isector) result(vecDim)
+    !
+    ! Returns the dimensions :f:var:`vecdim` of the vectors used in the Arpack/Lanczos produces given the current sector index :f:var:`isector` . If parallel mode is active the returned dimension corresponds to the correct chunk for each thread. 
+    !
+    integer :: isector          !current sector index
+    integer :: vecDim           !vector or vector chunck dimension  
     integer :: mpiQdw
     integer :: DimUps(Ns_Ud),DimUp
     integer :: DimDws(Ns_Ud),DimDw
@@ -218,9 +257,9 @@ contains
     !
     vecDim=DimUp*mpiQdw
     !
-  end function vecDim_Hv_sector
+  end function vecDim_Hv_sector_normal
 
 
 
 
-end MODULE ED_HAMILTONIAN
+end MODULE ED_HAMILTONIAN_NORMAL

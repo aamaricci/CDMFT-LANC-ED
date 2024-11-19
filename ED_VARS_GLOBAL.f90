@@ -16,7 +16,7 @@ MODULE ED_VARS_GLOBAL
   !-------------------- H EXPANSION STRUCTURE ----------------------!
   type H_operator
      ! The matrix storing in the basis [:f:var:`nambu` , :f:var:`nambu` , :f:var:`nspin` , :f:var:`nspin` , :f:var:`nimp` , :f:var:`nimp` ] each element of the Matrix basis decomposing the replica/general bath Hamiltonian :math:`H_p=\sum_{i=1}^{N_{basis}} \lambda_i(p) O_i`, where :math:`N_{basis}` is the dimension of the user defined basis.  
-     complex(8),dimension(:,:,:,:,:,:),allocatable           :: O  !Bath hamiltonian (replica/general)
+     complex(8),dimension(:,:,:,:,:,:),allocatable           :: O  !Matrix Basis for Bath Hamiltonian decomposition
   end type H_operator
 
 
@@ -165,9 +165,7 @@ MODULE ED_VARS_GLOBAL
   integer,save                                           :: Ns_ud
   !
   integer                                                :: Nimp     !Total number of levels in the impurity cluster: Nlat*Norb
-  integer                                                :: Nlso     !Nspin*Nimp
   integer                                                :: Nambu   !Global Nambu factor for SC calculations
-  integer                                                :: Ntot     !Nambu*Nspin*Nlat*Norb
   
 
   !Some maps between sectors and full Hilbert space (pointers)
@@ -176,13 +174,11 @@ MODULE ED_VARS_GLOBAL
   integer,allocatable,dimension(:)                       :: getDim             ! [Nsectors]
   integer,allocatable,dimension(:,:,:)                   :: getCsector         ! [1/Norb,2,NSectors]
   integer,allocatable,dimension(:,:,:)                   :: getCDGsector       ! [1/Norb,2,NSectors]
-  integer,allocatable,dimension(:,:,:)                   :: getBathStride
-  integer,allocatable,dimension(:,:)                     :: impIndex
+  integer,allocatable,dimension(:,:)                     :: getBathStride
   logical,allocatable,dimension(:)                       :: twin_mask
   logical,allocatable,dimension(:)                       :: sectors_mask
   integer,allocatable,dimension(:,:)                     :: getSector
   integer,allocatable,dimension(:)                       :: getSz
-  integer,allocatable,dimension(:)                       :: getN
 
 
   !Effective Bath used in the ED code (this is opaque to user)
@@ -237,19 +233,12 @@ MODULE ED_VARS_GLOBAL
   !Impurity Green's function and Self-Energies: (Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,:)
   !PRIVATE (now public but accessible thru routine)
   !=========================================================
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impGmats
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impGreal
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impG0mats
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impG0real
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSmats 
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSreal
-  !
-  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAmats
-  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impSAreal
-  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impFmats
-  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impFreal
-  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0mats
-  ! complex(8),allocatable,dimension(:,:,:,:,:)            :: impF0real
+  ! complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impGmats
+  ! complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impGreal
+  ! complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impG0mats
+  ! complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impG0real
+  ! complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSmats 
+  ! complex(8),allocatable,dimension(:,:,:,:,:,:,:)        :: impSreal
   !
   type(GFmatrix),allocatable,dimension(:,:,:,:,:,:)      :: impGmatrix
 
@@ -300,7 +289,6 @@ MODULE ED_VARS_GLOBAL
   character(len=10)                                      :: indx_suffix="_indx"
   integer                                                :: indx_padding=4
   logical                                                :: Jhflag  
-  logical                                                :: offdiag_gf_flag=.false.
 
 
 

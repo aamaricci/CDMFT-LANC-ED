@@ -2,7 +2,7 @@
 !PURPOSE  : Diagonalize the Effective Impurity Problem
 !|{ImpUP1,...,ImpUPN},BathUP>|{ImpDW1,...,ImpDWN},BathDW>
 !########################################################################
-module ED_DIAG
+module ED_DIAG_NORMAL
   USE SF_CONSTANTS
   USE SF_LINALG, only: eigh
   USE SF_TIMER,  only: start_timer,stop_timer,eta
@@ -14,14 +14,13 @@ module ED_DIAG
   USE ED_VARS_GLOBAL
   USE ED_EIGENSPACE
   USE ED_SETUP
-  USE ED_HAMILTONIAN
+  USE ED_SECTOR
+  USE ED_HAMILTONIAN_NORMAL
   implicit none
   private
 
 
-  public :: diagonalize_impurity
-
-  complex(8),dimension(:),pointer       :: state_cvec
+  public :: diagonalize_impurity_normal
 
 
 contains
@@ -35,11 +34,33 @@ contains
   !PURPOSE  : Setup the Hilbert space, create the Hamiltonian, get the
   ! GS, build the Green's functions calling all the necessary routines
   !+------------------------------------------------------------------+
-  subroutine diagonalize_impurity()
+  subroutine diagonalize_impurity_normal()
+    !
+    ! This procedure performs the diagonalization of the Hamiltonian in each symmetry sector for :f:var:`ed_mode` = :f:var:`normal` , i.e. for quantum number :math:`\vec{Q}=[\vec{N}_\uparrow,\vec{N}_\downarrow]`.
+    !
+    !
+    ! The diagonalization proceeds in three steps.
+    !
+    ! #. Setup the diagonalization of selected sectors only if the file :f:var:`sectorfile` exists.
+    !
+    ! #. Perform a cycle over all the symmetry sectors :math:`{\cal S}(\vec{Q})`
+    !
+    !   * Decide if the sector should be diagonalized, i.e. if this is a twin sector and :f:var:`ed_twin` is True.
+    !
+    !   * Setup the Arpack/Lanczos parameters :f:var:`neigen` , :f:var:`nblock` , :f:var:`nitermax`
+    !
+    !   * Construct the sector Hamiltonian and/or just associate the correct matrix-vector product in :f:var:`build_hv_sector_normal`
+    !
+    !   * call :f:var:`sp_eigh` (Arpack) or :f:var:`sp_lanc_eigh` (Lanczos) or :f:var:`eigh` (Lapack) according to the dimension of the sector and the value of :f:var:`lanc_method`
+    !
+    !   * Retrieve the eigen-states and save them to :f:var:`state_list`
+    !
+    ! #. Analyze the :f:var:`state_list` , find the overall groundstate :math:`|\psi_0\rangle` , trim the list using the :f:var:`cutoff` :math:`\epsilon` to that :math:`e^{-\beta E_{max}} < \epsilon` , create an histogram of the states requested to each sector and use it to increase or decrease those number according to the contribution of each sector to the spectrum.
+    !
     call ed_pre_diag
     call ed_diag_d
     call ed_post_diag
-  end subroutine diagonalize_impurity
+  end subroutine diagonalize_impurity_normal
 
 
 
@@ -77,16 +98,12 @@ contains
     iter=0
     sector: do isector=1,Nsectors
        if(.not.sectors_mask(isector))cycle sector
-       if(.not.twin_mask(isector))cycle sector !cycle loop if this sector should not be investigated
+       if(.not.twin_mask(isector))cycle sector
        iter=iter+1
        call get_Nup(isector,nups)
        call get_Ndw(isector,ndws)
-       Tflag    = twin_mask(isector).AND.ed_twin
-       bool=.true.
-       do i=1,Ns_ud
-          Bool=Bool.AND.(nups(i)/=ndws(i))
-       enddo
-       Tflag=Tflag.AND.Bool
+       Tflag = twin_mask(isector).AND.ed_twin
+       Tflag = Tflag.AND.(any(nups/=ndws))
        !
        Dim      = getdim(isector)
        !
@@ -135,13 +152,11 @@ contains
        !
        if(ed_verbose>=3.AND.MPIMASTER)call start_timer()
        if(lanc_solve)then
+          allocate(eig_values(Neigen)) ; eig_values=0d0 
           !
-          allocate(eig_values(Neigen))
-          eig_values=0d0 
+          call build_Hv_sector_normal(isector) 
           !
-          call build_Hv_sector(isector) !For MPI: MpiComm==MpiComm_Global .OR. MpiComm subset of MpiComm_Global
-          !
-          vecDim = vecDim_Hv_sector(isector)
+          vecDim = vecDim_Hv_sector_normal(isector)
           allocate(eig_basis(vecDim,Neigen))
           eig_basis=zero
           !
@@ -153,20 +168,20 @@ contains
                      Nblock,&
                      Nitermax,&
                      tol=lanc_tolerance,&
-                     iverbose=(ed_verbose>3))
+                     iverbose=(ed_verbose>4))
              else
                 call sp_eigh(spHtimesV_p,eig_values,eig_basis,&
                      Nblock,&
                      Nitermax,&
                      tol=lanc_tolerance,&
-                     iverbose=(ed_verbose>3))
+                     iverbose=(ed_verbose>4))
              endif
 #else
-                call sp_eigh(spHtimesV_p,eig_values,eig_basis,&
+             call sp_eigh(spHtimesV_p,eig_values,eig_basis,&
                   Nblock,&
                   Nitermax,&
                   tol=lanc_tolerance,&
-                  iverbose=(ed_verbose>3))
+                  iverbose=(ed_verbose>4))
 #endif             
              !
              !
@@ -174,37 +189,37 @@ contains
 #ifdef _MPI
              if(MpiStatus)then
                 call sp_lanc_eigh(MpiComm,spHtimesV_p,eig_values(1),eig_basis(:,1),Nitermax,&
-                     iverbose=(ed_verbose>3),threshold=lanc_tolerance)
+                     iverbose=(ed_verbose>4),threshold=lanc_tolerance)
              else
                 call sp_lanc_eigh(spHtimesV_p,eig_values(1),eig_basis(:,1),Nitermax,&
-                     iverbose=(ed_verbose>3),threshold=lanc_tolerance)
+                     iverbose=(ed_verbose>4),threshold=lanc_tolerance)
              endif
 #else
              call sp_lanc_eigh(spHtimesV_p,eig_values(1),eig_basis(:,1),Nitermax,&
-                  iverbose=(ed_verbose>3),threshold=lanc_tolerance)
+                  iverbose=(ed_verbose>4),threshold=lanc_tolerance)
 #endif
           end select
           !
           !
           if(MpiMaster.AND.ed_verbose>3)write(LOGfile,*)""
-          call delete_Hv_sector()
-          call Bcast_MPI(MpiComm,eig_values)
-          !
+          call delete_Hv_sector_normal()
+#ifdef _MPI
+          if(MpiStatus)call Bcast_MPI(MpiComm,eig_values)
+#endif
           !
        else                     !else LAPACK_SOLVE
-          !
-          !
           allocate(eig_values(Dim)) ; eig_values=0d0
           allocate(eig_basis_tmp(Dim,Dim)) ; eig_basis_tmp=zero
-          call build_Hv_sector(isector,eig_basis_tmp)
+          call build_Hv_sector_normal(isector,eig_basis_tmp)
+          !
           if(MpiMaster)call eigh(eig_basis_tmp,eig_values)
           if(dim==1)eig_basis_tmp(dim,dim)=one
           !
-          call delete_Hv_sector()
+          call delete_Hv_sector_normal()
 #ifdef _MPI
           if(MpiStatus)then
              call Bcast_MPI(MpiComm,eig_values)
-             vecDim = vecDim_Hv_sector(isector)
+             vecDim = vecDim_Hv_sector_normal(isector)
              allocate(eig_basis(vecDim,Neigen)) ; eig_basis=zero
              call scatter_basis_MPI(MpiComm,eig_basis_tmp,eig_basis)
           else
@@ -219,12 +234,9 @@ contains
        endif
        !
        if(ed_verbose>=3.AND.MPIMASTER)call stop_timer()
-       !
-       if(ed_verbose>=4)then
-          write(LOGfile,*)"EigValues: ",eig_values(:Neigen)
-          write(LOGfile,*)""
-          write(LOGfile,*)""
-       endif
+       if(ed_verbose>=4)write(LOGfile,*)"EigValues: ",eig_values(:Neigen)
+       if(ed_verbose>2)write(LOGfile,*)""
+       if(ed_verbose>2)write(LOGfile,*)""
        !
        if(finiteT)then
           do i=1,Neigen
@@ -256,7 +268,8 @@ contains
        if(allocated(eig_basis))deallocate(eig_basis)
        !
     enddo sector
-    if(MPIMASTER)call stop_timer(unit=LOGfile)
+    if(MPIMASTER)call stop_timer()
+    !
   end subroutine ed_diag_d
 
 
@@ -268,11 +281,11 @@ contains
 
 
 
-  !###################################################################################################
+  !#######################################################################################
   !
   !    PRE-PROCESSING ROUTINES
   !
-  !###################################################################################################
+  !#######################################################################################
   subroutine ed_pre_diag
     integer                          :: Indices(2*Ns_Ud),Jndices(2*Ns_Ud)
     integer                          :: Nups(Ns_ud),Ndws(Ns_ud)
@@ -301,16 +314,8 @@ contains
              sectors_mask(isector)=.true.
              write(unit2,*)isector,sectors_mask(isector),Indices
              !
-             do i=1,2*Ns_Ud
-                do ishift=1,ed_sectors_shift
-                   do isign=-1,1,2
-                      Jndices    = Indices
-                      Jndices(i) = Indices(i) + isign*ishift
-                      call get_Sector(Jndices,Ns_Orb,jsector)
-                      sectors_mask(jsector)=.true.
-                      write(unit2,*)jsector,sectors_mask(jsector),Jndices
-                   enddo
-                enddo
+             do isign=-1,1,2
+                if(ed_sectors_shift > 0) call shift_sector(Indices,1,isign,unit2)
              enddo
              !
           enddo
@@ -323,6 +328,24 @@ contains
   end subroutine ed_pre_diag
 
 
+  recursive subroutine shift_sector(Indices,ishift,isign,unit2)
+    integer                          :: Indices(2*Ns_Ud),Jndices(2*Ns_Ud)
+    integer                          :: jsector
+    integer                          :: ishift,isign,i,unit2
+    !
+    do i=1,2*Ns_Ud
+       Jndices    = Indices
+       Jndices(i) = Indices(i) + isign
+       call get_Sector(Jndices,Ns_Orb,jsector)
+       if(.not. sectors_mask(jsector)) then
+          sectors_mask(jsector)=.true.
+          write(unit2,*)jsector,sectors_mask(jsector),Jndices
+       endif
+       if(ishift+1 <= ed_sectors_shift) then
+          call shift_sector(Jndices,ishift+1,isign,unit2)
+       endif
+    enddo
+  end subroutine shift_sector
 
 
   !###################################################################################################
@@ -483,7 +506,7 @@ contains
           isector = es_return_sector(state_list,istate)
           write(unit,"(i6,f18.12,2x,ES19.12,1x,2I10)",advance='no')&
                istate,Estate,exp(-beta*(Estate-state_list%emin)),isector,getdim(isector)
-          call get_Indices(isector,Ns_Orb,Indices)
+          call get_QuantumNumbers(isector,Ns_Orb,Indices)
           write(unit,"("//str(2*Ns_Ud)//"I4)")Indices
        enddo
     endif
@@ -497,7 +520,7 @@ contains
     if(MPIMASTER)then
        do istate=1,state_list%size
           isector = es_return_sector(state_list,istate)
-          call get_Indices(isector,Ns_Orb,Indices)
+          call get_QuantumNumbers(isector,Ns_Orb,Indices)
           write(unit,"(i8,i12,"//str(2*Ns_Ud)//"i8)")istate,isector,Indices
        enddo
     endif
@@ -519,7 +542,7 @@ contains
        else
           write(unit,"(A10,A15)")" #X Sector","Indices"
        endif
-       call get_Indices(isector,Ns_Orb,Indices)
+       call get_QuantumNumbers(isector,Ns_Orb,Indices)
        write(unit,"(I9,"//str(2*Ns_Ud)//"I6)")isector,Indices
        do i=1,size(eig_values)
           write(unit,*)eig_values(i)
@@ -532,7 +555,7 @@ contains
 
 
 
-end MODULE ED_DIAG
+end MODULE ED_DIAG_NORMAL
 
 
 

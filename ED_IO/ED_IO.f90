@@ -1,746 +1,519 @@
 MODULE ED_IO
-   USE ED_INPUT_VARS
-   USE ED_VARS_GLOBAL
-   USE ED_AUX_FUNX
-   USE ED_SETUP
-   USE ED_BATH
-   USE ED_BATH_FUNCTIONS
-   USE SF_LINALG
-   USE SF_ARRAYS, only: linspace,arange
-   USE SF_IOTOOLS, only: str,reg,free_unit,splot,sread
-   implicit none
-   private
-
-   !Retrieve self-energy through routines:
-   interface ed_get_sigma_matsubara
-      module procedure ed_get_sigma_matsubara_1
-      module procedure ed_get_sigma_matsubara_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_sigma_matsubara_lattice_1
-#endif
-      !     module procedure ed_get_sigma_matsubara_lattice_2
-   end interface ed_get_sigma_matsubara
-
-   interface ed_get_sigma_realaxis
-      module procedure ed_get_sigma_real_1
-      module procedure ed_get_sigma_real_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_sigma_real_lattice_1
-#endif
-      !     module procedure ed_get_sigma_real_lattice_2
-   end interface ed_get_sigma_realaxis
-
-   !Retrieve imp GF through routines.
-   interface ed_get_gimp_matsubara
-      module procedure ed_get_gimp_matsubara_1
-      module procedure ed_get_gimp_matsubara_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_gimp_matsubara_lattice_1
-#endif
-      !     module procedure ed_get_gimp_matsubara_lattice_2
-   end interface ed_get_gimp_matsubara
-
-
-   interface ed_get_gimp_realaxis
-      module procedure ed_get_gimp_real_1
-      module procedure ed_get_gimp_real_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      procedure ed_get_gimp_real_lattice_1
-#endif
-      !module procedure ed_get_gimp_real_lattice_2
-   end interface ed_get_gimp_realaxis
-
-
-
-
-   !Retrieve imp GF_0 (G0_and) through routines.
-   interface ed_get_g0imp_matsubara
-      module procedure ed_get_g0imp_matsubara_1
-      module procedure ed_get_g0imp_matsubara_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_g0imp_matsubara_lattice_1
-#endif
-      !     module procedure ed_get_g0imp_matsubara_lattice_2
-   end interface ed_get_g0imp_matsubara
-
-
-   interface ed_get_g0imp_realaxis
-      module procedure ed_get_g0imp_real_1
-      module procedure ed_get_g0imp_real_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_g0imp_real_lattice_1
-#endif
-      !     module procedure ed_get_g0imp_real_lattice_2
-   end interface ed_get_g0imp_realaxis
-
-
-
-   interface ed_get_delta_matsubara
-      module procedure delta_bath_main_
-   end interface ed_get_delta_matsubara
-
-   interface ed_get_delta_realaxis
-      module procedure delta_bath_main_ !mats is the same as real
-   end interface ed_get_delta_realaxis
-
-
-   interface ed_get_g0and_matsubara
-      module procedure g0and_bath_main_
-   end interface ed_get_g0and_matsubara
-
-   interface ed_get_g0and_realaxis
-      module procedure g0and_bath_main_
-   end interface ed_get_g0and_realaxis
-
-
-
-   interface ed_get_invg0and_matsubara
-      module procedure invg0_bath_main_
-   end interface ed_get_invg0and_matsubara
-
-   interface ed_get_invg0and_realaxis
-      module procedure invg0_bath_main_
-   end interface ed_get_invg0and_realaxis
-
-
-   !Retrieve static common observables
-   interface ed_get_dens
-      module procedure ed_get_dens_1
-      module procedure ed_get_dens_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_dens_lattice_1
-#endif
-      !     module procedure ed_get_dens_lattice_2
-   end interface ed_get_dens
-
-   interface ed_get_mag
-      module procedure ed_get_mag_1
-      module procedure ed_get_mag_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_mag_lattice_1
-#endif
-      !     module procedure ed_get_mag_lattice_2
-   end interface ed_get_mag
-
-   interface ed_get_docc
-      module procedure ed_get_docc_1
-      module procedure ed_get_docc_2
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure ed_get_docc_lattice_1
-#endif
-      !     module procedure ed_get_docc_lattice_2
-   end interface ed_get_docc
-
-   interface ed_get_epot
-      module procedure :: ed_get_epot_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_epot_lattice
-#endif
-   end interface ed_get_epot
-
-   interface ed_get_eint
-      module procedure :: ed_get_eint_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_eint_lattice
-#endif
-   end interface ed_get_eint
-
-   interface ed_get_ehartree
-      module procedure :: ed_get_ehartree_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_ehartree_lattice
-#endif
-   end interface ed_get_ehartree
-
-   interface ed_get_eknot
-      module procedure :: ed_get_eknot_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_eknot_lattice
-#endif
-   end interface ed_get_eknot
-
-
-   interface ed_get_dust
-      module procedure :: ed_get_dust_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_dust_lattice
-#endif
-   end interface ed_get_dust
-
-   interface ed_get_dund
-      module procedure :: ed_get_dund_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_dund_lattice
-#endif
-   end interface ed_get_dund
-
-   interface ed_get_dse
-      module procedure :: ed_get_dse_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_dse_lattice
-#endif
-   end interface ed_get_dse
-
-   interface ed_get_dph
-      module procedure :: ed_get_dph_
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_dph_lattice
-#endif
-   end interface ed_get_dph
-
-
-
-   interface ed_get_cluster_dm
-      module procedure :: ed_get_cluster_density_matrix_single
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_cluster_density_matrix_lattice
-#endif
-   end interface ed_get_cluster_dm
-
-   interface ed_print_dm
-      module procedure :: ed_print_dm_orb
-      module procedure :: ed_print_dm_LEGACY
-   end interface ed_print_dm
-
-   interface ed_get_reduced_dm
-      module procedure :: ed_get_reduced_density_matrix_single
-      module procedure :: ed_get_reduced_density_matrix_single_LEGACY
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_reduced_density_matrix_lattice
-#endif
-   end interface ed_get_reduced_dm
-
-   interface ed_get_sp_dm
-      module procedure :: ed_get_single_particle_density_matrix_single
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_get_single_particle_density_matrix_lattice
-#endif
-   end interface ed_get_sp_dm
-
-
-
-   interface ed_gf_cluster
-      module procedure :: ed_gf_cluster_scalar
-      module procedure :: ed_gf_cluster_array
-   end interface ed_gf_cluster
-
-   interface ed_read_impsigma
-      module procedure :: ed_read_impsigma_single
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_read_impsigma_lattice
-#endif
-   end interface ed_read_impsigma
-
-   interface ed_read_impG
-      module procedure :: ed_read_impG_single
-#if __GFORTRAN__ &&  __GNUC__ > 8
-      module procedure :: ed_read_impG_lattice
-#endif
-   end interface ed_read_impG
-
-   public :: ed_get_sigma_matsubara
-   public :: ed_get_sigma_realaxis
-
-   public :: ed_get_gimp_matsubara
-   public :: ed_get_gimp_realaxis
-
-   public :: ed_get_g0imp_matsubara
-   public :: ed_get_g0imp_realaxis
-
-   public :: ed_get_delta_matsubara
-   public :: ed_get_delta_realaxis
-
-   public :: ed_get_g0and_matsubara
-   public :: ed_get_g0and_realaxis
-
-   public :: ed_get_invG0and_matsubara
-   public :: ed_get_invG0and_realaxis
-
-
-   public :: ed_gf_cluster
-
-   public :: ed_get_dens
-   public :: ed_get_mag
-   public :: ed_get_docc
-
-   public :: ed_get_epot
-   public :: ed_get_eint
-   public :: ed_get_ehartree
-   public :: ed_get_eknot
-
-   public :: ed_get_dust
-   public :: ed_get_dund
-   public :: ed_get_dse
-   public :: ed_get_dph
-
-   public :: ed_get_cluster_dm
-   public :: ed_get_reduced_dm
-   public :: ed_get_sp_dm
-
-   public :: ed_read_impSigma
-   public :: ed_read_impG
-
-   !****************************************************************************************!
-   !****************************************************************************************!
-
-   public :: ed_print_impSigma
-   public :: ed_print_impG
-   public :: ed_print_impG0
-   public :: ed_print_dm
-   ! public :: ed_print_impChi
-
-
-   !****************************************************************************************!
-   !****************************************************************************************!
-
-
-
-   !Frequency and time arrays:
-   !=========================================================
-   real(8),dimension(:),allocatable :: wm,tau,wr,vm
-   character(len=64)                :: suffix
-
-
+  USE ED_INPUT_VARS
+  USE ED_VARS_GLOBAL
+  USE ED_AUX_FUNX
+  USE ED_SETUP
+  USE ED_BATH
+  USE ED_BATH_FUNCTIONS
+  USE SF_LINALG
+  USE SF_ARRAYS, only: linspace,arange
+  USE SF_IOTOOLS, only: str,reg,free_unit,splot,sread
+  implicit none
+  private
+
+
+
+
+
+  !Retrieve self-energy through routines:
+  interface ed_get_sigma
+     !| This subrotine gets from the EDIpack2 library the value of the self-energy calculated 
+     ! on the Matsubara or real-frequency axis, with number of frequencies :f:var:`lmats` or :f:var:`lreal` .
+     !| The self-energy is an array having the following possible dimensions:
+     !
+     !  * [:f:var:`nspin` :math:`\cdot` :f:var:`norb`, :f:var:`nspin`:math:`\cdot`:f:var:`norb`, :f:var:`lmats` / :f:var:`lreal`]
+     !  * [:f:var:`nspin`, :f:var:`nspin`, :f:var:`norb`, :f:var:`norb`, :f:var:`lmats` / :f:var:`lreal`]
+     !
+     module procedure :: ed_get_sigma_site_n2
+     module procedure :: ed_get_sigma_site_n4
+     module procedure :: ed_get_sigma_site_n6
+  end interface ed_get_sigma
+
+
+
+  interface ed_get_gimp
+     !This subroutine gets from the EDIpack2 library the value of the impurity Green's function calculated 
+     !on the Matsubara or real-frequency axis, with number of frequencies :f:var:`lmats` or :f:var:`lreal` .
+     !
+     !The impurity Green's function is an array having the following possible dimensions:
+     !
+     !  * [:f:var:`nspin` :math:`\cdot` :f:var:`norb`, :f:var:`nspin`:math:`\cdot`:f:var:`norb`, :f:var:`lmats` / :f:var:`lreal`]
+     !  * [:f:var:`nspin`, :f:var:`nspin`, :f:var:`norb`, :f:var:`norb`, :f:var:`lmats` / :f:var:`lreal`]
+     !
+     module procedure :: ed_get_gimp_site_n2
+     module procedure :: ed_get_gimp_site_n4
+     module procedure :: ed_get_gimp_site_n6
+  end interface ed_get_gimp
+
+
+
+
+  interface ed_get_g0imp
+     !| This subroutine gets from the EDIpack2 library the value of the impurity non-interacting Green's function calculated 
+     ! on the Matsubara or real-frequency axis, with number of frequencies :f:var:`lmats` or :f:var:`lreal` .
+     !
+     !The impurity non-interacting Green's function is an array having the following possible dimensions:
+     ! 
+     !  * [:f:var:`nspin` :math:`\cdot` :f:var:`norb`, :f:var:`nspin`:math:`\cdot`:f:var:`norb`, :f:var:`lmats` / :f:var:`lreal`]  
+     !  * [:f:var:`nspin`, :f:var:`nspin`, :f:var:`norb`, :f:var:`norb`, :f:var:`lmats` / :f:var:`lreal`]
+     !
+     !The bath is an array having the following dimension:
+     !
+     !  * [:f:var:`nb`] for single-impurity DMFT
+     !
+     !Where :f:var:`nb` is the length of the :f:var:`bath` array.
+     !
+     module procedure :: ed_get_g0imp_site_n2
+     module procedure :: ed_get_g0imp_site_n4
+     module procedure :: ed_get_g0imp_site_n6
+  end interface ed_get_g0imp
+
+
+
+
+  !Build Gand/Delta from a user bath
+  interface ed_get_g0and
+     !| This subroutine returns to the user the normal non-interacting Green's function :math:`G_0(x)` and
+     ! the anomalous non-interacting Green's function :math:`F_0(x)` on a given set of frequencies. It does so
+     ! by calling :f:func:`g0and_bath_function` and :f:func:`g0and_bath_function`.
+     !
+     !The non-interacting Green's function is an array having the following possible dimensions:
+     ! 
+     !  * [:f:var:`nspin` :math:`\cdot` :f:var:`norb`, :f:var:`nspin`:math:`\cdot`:f:var:`norb`, :code:`size(x)`]  
+     !  * [:f:var:`nspin`, :f:var:`nspin`, :f:var:`norb`, :f:var:`norb`, :code:`size(x)`]
+     !
+     module procedure :: ed_get_g0and_n2
+     module procedure :: ed_get_g0and_n4
+     module procedure :: ed_get_g0and_n6
+  end interface ed_get_g0and
+
+  interface ed_get_delta
+     !| This subroutine returns to the user the normal hybridization function :math:`\Delta(x)` and
+     ! the anomalous hybridization function :math:`\Theta(x)` on a given set of frequencies. It does so
+     ! by calling :f:func:`delta_bath_function` and :f:func:`fdelta_bath_function`.
+     !
+     !The hybridization function is an array having the following possible dimensions:
+     ! 
+     !  * [:f:var:`nspin` :math:`\cdot` :f:var:`norb`, :f:var:`nspin`:math:`\cdot`:f:var:`norb`, :code:`size(x)`]  
+     !  * [:f:var:`nspin`, :f:var:`nspin`, :f:var:`norb`, :f:var:`norb`, :code:`size(x)`]
+     !
+     module procedure :: ed_get_delta_n2
+     module procedure :: ed_get_delta_n4
+     module procedure :: ed_get_delta_n6
+  end interface ed_get_delta
+
+
+
+  !****************************************************************************************!
+  !****************************************************************************************!
+
+
+
+  !Observables
+  interface ed_get_dens
+     !This subroutine gets from the EDIpack2 library the value of the charge density and passes it to the user.
+     !
+     !The :f:var:`self` variable can have the following dimensions:
+     ! 
+     !  * scalar: if :f:var:`iorb` is provided for single-impurity DMFT, density for that orbital
+     !  * [:f:var:`norb`]: if no optional variable is provided for single-impurity DMFT, density for all orbitals
+     !  * [:f:var:`nlat`, :f:var:`norb`]: if :f:var:`nlat` is provided for real-space DMFT, density for all impurity sites and orbitals
+     !
+     module procedure :: ed_get_dens_d0
+     module procedure :: ed_get_dens_d1
+     module procedure :: ed_get_dens_d2
+  end interface ed_get_dens
+
+  interface ed_get_mag
+     !This subroutine gets from the EDIpack2 library the value of the magnetization and passes it to the user.
+     !
+     !The :f:var:`self` variable can have the following dimensions:
+     ! 
+     !  * scalar: if :f:var:`component` and :f:var:`iorb` are provided for single-impurity DMFT, given magnetization component for that orbital
+     !  * [:f:var:`norb`]: for single-impurity DMFT, one magnetization component for all orbitals
+     !  * [:f:var:`nlat`, :f:var:`norb`]: if :f:var:`nlat` is provided for real-space DMFT, one magnetization component for all orbitals and impurity sites
+     !  * [:f:var:`nlat`, :code:`3`, :f:var:`norb`]: if :f:var:`nlat` is provided for real-space DMFT, all magnetization components for all orbitals and sites
+     !
+     module procedure :: ed_get_mag_d0
+     module procedure :: ed_get_mag_d1
+     module procedure :: ed_get_mag_d2
+  end interface ed_get_mag
+
+  interface ed_get_docc
+     !This subroutine gets from the EDIpack2 library the value of the double occupation and passes it to the user.
+     !
+     !The :f:var:`self` variable can have the following dimensions:
+     ! 
+     !  * scalar: if :f:var:`iorb` is provided for single-impurity DMFT, dobule-occupation for that orbital
+     !  * [:f:var:`norb`]: if no optional variable is provided for single-impurity DMFT, double-occupation for all orbitals
+     !  * [:f:var:`nlat`, :f:var:`norb`]: if :f:var:`nlat` is provided for real-space DMFT, double-occupation for all impurity sites and orbitals
+     !
+     module procedure :: ed_get_docc_d0
+     module procedure :: ed_get_docc_d1
+     module procedure :: ed_get_docc_d3
+  end interface ed_get_docc
+
+  interface ed_get_phi
+     !This subroutine gets from the EDIpack2 library the value of the superconducting order parameter :math:`\phi` ( :f:var:`ed_mode` = :code:`superc` ) and passes it to the user.
+     !
+     !The :f:var:`self` variable can have the following dimensions:
+     ! 
+     !  * scalar: if :f:var:`iorb` is provided for single-impurity DMFT, :math:`\phi` for that orbital
+     !  * [:f:var:`norb`]: if no optional variable is provided for single-impurity DMFT, :math:`\phi` for all orbitals
+     !  * [:f:var:`nlat`, :f:var:`norb`]: if :f:var:`nlat` is provided for real-space DMFT, :math:`\phi` for all impurity sites and orbitals
+     !
+     module procedure :: ed_get_phisc_d0
+     module procedure :: ed_get_phisc_d1
+     module procedure :: ed_get_phisc_d2
+  end interface ed_get_phi
+
+
+  !****************************************************************************************!
+  !****************************************************************************************!
+
+
+
+
+
+
+
+  interface ed_get_epot
+     !This subroutine gets from the EDIpack2 library and passes to the user the value of 
+     !:f:var:`ed_epot`, the energy contribution from the interaction terms, **including** the Hartree term.
+     !The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_epot_n0
+  end interface ed_get_epot
+
+  interface ed_get_eint
+     !This subroutine gets from the EDIpack2 library and passes to the user the value of 
+     !:f:var:`ed_int`, the energy contribution from the interaction terms, **excluding** the Hartree term.
+     !The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_eint_n0
+  end interface ed_get_eint
+
+  interface ed_get_ehartree
+     !This subroutine gets from the EDIpack2 library and passes to the user the value of the Hartree potential 
+     !:f:var:`ed_ehartree`. The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_ehartree_n0
+  end interface ed_get_ehartree
+
+  interface ed_get_eknot
+     !This subroutine gets from the EDIpack2 library and passes to the user the value
+     !:f:var:`ed_eknot`, the kinetic term from the **local** 1-body Hamiltonian
+     !The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_eknot_n0
+  end interface ed_get_eknot
+
+
+  !Get Energies
+  interface ed_get_eimp
+     !This subroutine gets from the EDIpack2 library and passes to the user the array [ :f:var:`ed_epot` , :f:var:`ed_eint` , :f:var:`ed_ehartree` , :f:var:`ed_eknot` ].
+     !These are the expectation values various contribution to the internal energy
+     !
+     !  * :f:var:`ed_epot` = energy contribution from the interaction terms, **including** the Hartree term
+     !  * :f:var:`ed_eint` = energy contribution from the interaction terms, **excluding** the Hartree term
+     !  * :f:var:`ed_ehartree` = :math:`-\frac{U}{2} \sum_{i} \langle n_{i\uparrow} + n_{i\downarrow} \rangle 
+     !    -\frac{2U^{'}-J_{H}}{2} \sum_{i < j} \langle n_{i\uparrow}+n_{i\downarrow} + n_{i\downarrow}+n_{j\downarrow} \rangle
+     !    +\frac{U}{4} + \frac{2U^{'}-J_{H}}{2}` for :math:`i,j` orbitals
+     !  * :f:var:`ed_eknot` = kinetic term from the **local** 1-body Hamiltonian
+     !
+     !The returned array can have the following dimensions:
+     !
+     !  * [:code:`4`]: for single-site DMFT
+     !
+     module procedure :: ed_get_eimp_n1
+  end interface ed_get_eimp
+
+
+
+  !****************************************************************************************!
+  !****************************************************************************************!
+
+
+
+
+
+  interface ed_get_dust
+     !This subroutine gets from the EDIpack2 library and passes to the user the value of 
+     !:f:var:`ed_dust` = :math:`\sum_{i < j} n_{i\uparrow}n_{j\downarrow} + n_{i\downarrow}n_{j\uparrow}` for :math:`i,j` orbitals
+     !The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_dust_n0
+  end interface ed_get_dust
+
+  interface ed_get_dund
+     !This subroutine gets from the EDIpack2 library and passes to the user the value of 
+     !:f:var:`ed_dund` = :math:`\sum_{i < j} n_{i\uparrow}n_{j\uparrow}  + n_{i\downarrow}n_{j\downarrow}` for :math:`i,j` orbitals
+     !The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_dund_n0
+  end interface ed_get_dund
+
+  interface ed_get_dse
+     !This subroutine gets from the EDIpack2 library and passes to the user the value of 
+     !:f:var:`ed_dse` = :math:`\sum_{i < j} c^{\dagger}_{i\uparrow}c^{\dagger}_{j\uparrow}c_{i\downarrow}c_{j\uparrow}` for :math:`i,j` orbitals
+     !The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_dse_n0
+  end interface ed_get_dse
+
+  interface ed_get_dph
+     !This subroutine gets from the EDIpack2 library and passes to the user the value of 
+     !:f:var:`ed_dph` = :math:`\sum_{i < j} c^{\dagger}_{i\uparrow}c^{\dagger}_{i\downarrow}c_{j\downarrow}c_{j\uparrow}` for :math:`i,j` orbitals
+     !The returned array can have the following dimensions:
+     !
+     !  * scalar: for single-site DMFT
+     !
+     module procedure :: ed_get_dph_n0
+  end interface ed_get_dph
+
+  interface ed_get_doubles
+     !This subroutine gets from the EDIpack2 library and passes to the user the array [ :f:var:`ed_dust` , :f:var:`ed_dund` , :f:var:`ed_dse` , :f:var:`ed_dph` ].
+     !These are the expectation values of the two-body operators associated with the density-density inter-orbital interaction (with opposite and parallel spins), 
+     !spin-exchange and pair-hopping.
+     !
+     !  * :f:var:`ed_dust` = :math:`\sum_{i < j} n_{i\uparrow}n_{j\downarrow} + n_{i\downarrow}n_{j\uparrow}` for :math:`i,j` orbitals
+     !  * :f:var:`ed_dund` = :math:`\sum_{i < j} n_{i\uparrow}n_{j\uparrow}  + n_{i\downarrow}n_{j\downarrow}` for :math:`i,j` orbitals
+     !  * :f:var:`ed_dse` = :math:`\sum_{i < j} c^{\dagger}_{i\uparrow}c^{\dagger}_{j\uparrow}c_{i\downarrow}c_{j\uparrow}` for :math:`i,j` orbitals
+     !  * :f:var:`ed_dph` = :math:`\sum_{i < j} c^{\dagger}_{i\uparrow}c^{\dagger}_{i\downarrow}c_{j\downarrow}c_{j\uparrow}` for :math:`i,j` orbitals
+     !
+     !The returned array can have the following dimensions:
+     !
+     !  * [:code:`4`]: for single-site DMFT
+     !
+     module procedure :: ed_get_doubles_n1
+  end interface ed_get_doubles
+
+  !****************************************************************************************!
+  !****************************************************************************************!
+
+  interface ed_get_cluster_dm
+     module procedure :: ed_get_cluster_density_matrix_single
+  end interface ed_get_cluster_dm
+
+  !>>DA RIVEDERE<<
+  interface ed_get_reduced_dm
+     module procedure :: ed_get_reduced_density_matrix_single
+     module procedure :: ed_get_reduced_density_matrix_single_LEGACY
+  end interface ed_get_reduced_dm
+
+
+  interface ed_get_sp_dm
+     module procedure :: ed_get_single_particle_density_matrix_single
+  end interface ed_get_sp_dm
+
+  !>>DA RIVEDERE<<
+  interface ed_gf_cluster
+     module procedure :: ed_gf_cluster_scalar
+     module procedure :: ed_gf_cluster_array
+  end interface ed_gf_cluster
+
+
+  interface ed_read_impsigma
+     module procedure :: ed_read_impsigma_single
+  end interface ed_read_impsigma
+
+  interface ed_print_dm
+     module procedure :: ed_print_dm_orb
+     module procedure :: ed_print_dm_LEGACY
+  end interface ed_print_dm
+
+
+  public :: ed_get_sigma
+  public :: ed_get_gimp
+  public :: ed_get_g0imp
+  public :: ed_get_g0and
+  public :: ed_get_delta
+
+  public :: ed_build_gimp
+  public :: ed_build_sigma
+
+  public :: ed_get_dens
+  public :: ed_get_mag
+  public :: ed_get_docc
+  public :: ed_get_phi
+  public :: ed_get_eimp
+  public :: ed_get_epot
+  public :: ed_get_eint 
+  public :: ed_get_ehartree
+  public :: ed_get_eknot
+  public :: ed_get_doubles
+  public :: ed_get_dust
+  public :: ed_get_dund
+  public :: ed_get_dse
+  public :: ed_get_dph
+
+  public :: ed_get_cluster_dm
+  public :: ed_get_reduced_dm
+  public :: ed_get_sp_dm
+  public :: ed_print_dm
+
+
+
+  !Frequency and time arrays:
+  !=========================================================
+  real(8),dimension(:),allocatable :: wm,tau,wr,vm
+  character(len=64)                :: suffix
+
+
+
+  integer                                         :: ilat,jlat
+  integer                                         :: iorb,jorb
+  integer                                         :: ispin,jspin
+  integer                                         :: is,js
+  integer                                         :: io,jo
+  integer                                         :: i,j
+  integer                                         :: L
+  complex(8),dimension(:,:,:,:,:,:,:),allocatable :: F
 
 
 contains
 
 
 
-   !+--------------------------------------------------------------------------+!
-   ! PURPOSE: Retrieve measured values of the impurity functions
-   !+--------------------------------------------------------------------------+!
-   include "ED_IO/get_sigma_matsubara.f90"
-   include "ED_IO/get_sigma_realaxis.f90"
-   include "ED_IO/get_gimp_matsubara.f90"
-   include "ED_IO/get_gimp_realaxis.f90"
-   include "ED_IO/get_g0imp_matsubara.f90"
-   include "ED_IO/get_g0imp_realaxis.f90"
-   include "ED_IO/get_Gand_all.f90"
-   include "ED_IO/gf_cluster.f90"
-
-#if __GFORTRAN__ &&  __GNUC__ > 8
-   include "ED_IO/lattice/get_sigma_matsubara.f90"
-   include "ED_IO/lattice/get_sigma_realaxis.f90"
-   include "ED_IO/lattice/get_gimp_matsubara.f90"
-   include "ED_IO/lattice/get_gimp_realaxis.f90"
-   include "ED_IO/lattice/get_g0imp_matsubara.f90"
-   include "ED_IO/lattice/get_g0imp_realaxis.f90"
-#endif
+  !+--------------------------------------------------------------------------+!
+  ! PURPOSE: Retrieve measured values of the impurity functions
+  !+--------------------------------------------------------------------------+!
+  include "ED_IO/get_sigma.f90"
+  include "ED_IO/get_gimp.f90"
+  include "ED_IO/get_g0imp.f90"
+  include "ED_IO/get_gand_bath.f90"
 
 
-   !+--------------------------------------------------------------------------+!
-   ! PURPOSE: Retrieve measured values of the local observables
-   !+--------------------------------------------------------------------------+!
-   include "ED_IO/get_dens.f90"
-   include "ED_IO/get_mag.f90"
-   include "ED_IO/get_docc.f90"
-   include "ED_IO/get_eimp.f90"
-   include "ED_IO/get_doubles.f90"
-   include "ED_IO/get_cluster_dm.f90"
-   include "ED_IO/get_reduced_dm.f90"
-   include "ED_IO/get_sp_dm.f90"
+  !+--------------------------------------------------------------------------+!
+  ! PURPOSE: Retrieve measured values of the local observables
+  !+--------------------------------------------------------------------------+!
+  include "ED_IO/observables/get_dens.f90"
+  include "ED_IO/observables/get_mag.f90"
+  include "ED_IO/observables/get_docc.f90"
+  include "ED_IO/observables/get_phi.f90"
+  include "ED_IO/observables/get_energy.f90"
+  include "ED_IO/observables/get_doubles.f90"
 
-#if __GFORTRAN__ &&  __GNUC__ > 8
-   include "ED_IO/lattice/get_dens.f90"
-   include "ED_IO/lattice/get_mag.f90"
-   include "ED_IO/lattice/get_docc.f90"
-   include "ED_IO/lattice/get_eimp.f90"
-   include "ED_IO/lattice/get_doubles.f90"
-   include "ED_IO/lattice/get_cluster_dm.f90"
-   include "ED_IO/lattice/get_reduced_dm.f90"
-   include "ED_IO/lattice/get_sp_dm.f90"
-#endif
-
-   !+------------------------------------------------------------------+
-   !                         PRINT SIGMA:
-   !+------------------------------------------------------------------+
-   subroutine ed_print_impSigma
-      character(len=64) :: suffix
-      integer           :: ilat,jlat,iorb,jorb,ispin
-      !
-      if(.not.allocated(wm))allocate(wm(Lmats))
-      if(.not.allocated(wr))allocate(wr(Lreal))
-      wm     = pi/beta*real(2*arange(1,Lmats)-1,8)
-      wr     = linspace(wini,wfin,Lreal)
-      !Print the impurity Sigma:
-      do ilat=1,Nlat
-         do jlat=1,Nlat
-            do iorb=1,Norb
-               do jorb=1,Norb
-                  do ispin=1,Nspin
-                     suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
-                     call splot("impSigma"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed"   ,wm,impSmats(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                     call splot("impSigma"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,impSreal(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                  enddo
-               enddo
-            enddo
-         enddo
-      enddo
-      !
-      if(allocated(wm))deallocate(wm)
-      if(allocated(wr))deallocate(wr)
-   end subroutine ed_print_impSigma
+  !+--------------------------------------------------------------------------+!
+  ! PURPOSE: RDMs
+  !+--------------------------------------------------------------------------+!
+  include "ED_IO/rdm/get_rdm.f90"
+  include "ED_IO/rdm/get_sp_dm.f90"
 
 
 
-
-   !+------------------------------------------------------------------+
-   !                         PRINT G
-   !+------------------------------------------------------------------+
-   subroutine ed_print_impG
-      character(len=64) :: suffix
-      integer           :: ilat,jlat,iorb,ispin,jorb
-      !
-      !
-      if(.not.allocated(wm))allocate(wm(Lmats))
-      if(.not.allocated(wr))allocate(wr(Lreal))
-      wm     = pi/beta*real(2*arange(1,Lmats)-1,8)
-      wr     = linspace(wini,wfin,Lreal)
-      !
-      do ilat=1,Nlat
-         do jlat=1,Nlat
-            do iorb=1,Norb
-               do jorb=1,Norb
-                  do ispin=1,Nspin
-                     suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
-                     call splot("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed"   ,wm,impGmats(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                     call splot("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,impGreal(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                  enddo
-               enddo
-            enddo
-         enddo
-      enddo
-      !
-      if(allocated(wm))deallocate(wm)
-      if(allocated(wr))deallocate(wr)
-      !
-   end subroutine ed_print_impG
-
-
-
-   !+------------------------------------------------------------------+
-   !                         PRINT G0
-   !+------------------------------------------------------------------+
-   subroutine ed_print_impG0
-      character(len=64) :: suffix
-      integer           :: ilat,jlat,iorb,ispin,jorb
-      !
-      if(.not.allocated(wm))allocate(wm(Lmats))
-      if(.not.allocated(wr))allocate(wr(Lreal))
-      wm     = pi/beta*real(2*arange(1,Lmats)-1,8)
-      wr     = linspace(wini,wfin,Lreal)
-      !
-      do ilat=1,Nlat
-         do jlat=1,Nlat
-            do iorb=1,Norb
-               do jorb=1,Norb
-                  do ispin=1,Nspin
-                     suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
-                     call splot("impG0"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed"   ,wm,impG0mats(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                     call splot("impG0"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,impG0real(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                  enddo
-               enddo
-            enddo
-         enddo
-      enddo
-      !
-      if(allocated(wm))deallocate(wm)
-      if(allocated(wr))deallocate(wr)
-      !
-   end subroutine ed_print_impG0
-
-
-   !+------------------------------------------------------------------+
-   !                      PRINT DENSITY MATRICES
-   !+------------------------------------------------------------------+
-   subroutine ed_print_dm_orb(dm,orbital_mask,ineq)
-      complex(8),dimension(:,:),intent(in)            :: dm
-      logical,dimension(Nlat,Norb),intent(in)         :: orbital_mask
-      integer                  ,intent(in),optional   :: ineq
-      integer                                         :: unit,Nsites
-      character(len=64)                               :: fname,suffix
-      integer                                         :: io,jo,Nrdm
-      integer,allocatable,dimension(:)                :: s1,s2,s3,s4
-      !
-      Nrdm = 4**count(orbital_mask)
-      !
-      if(size(dm,1)/=Nrdm.OR.size(dm,2)/=Nrdm)then
-         stop "ERROR: reduced density matrix and orbital mask have incompatible sizes"
-      endif
-      !
-      suffix = ""
-      do io = 1,Nlat
-        do jo = 1,Norb
-         if(orbital_mask(io,jo))then
-            suffix = trim(suffix)//"_i"//reg(str(io))//"l"//reg(str(jo))
-         endif
-        enddo
-      enddo
-      if(present(ineq))then
-         fname = "reduced_density_matrix"//trim(suffix)//"_ineq"//reg(str(ineq))//".dat"
-      else
-         fname = "reduced_density_matrix"//trim(suffix)//".dat"
-      endif
-      !
-      unit = free_unit()
-      open(unit,file=fname,action="write",position="rewind",status='unknown')
-      !
-      do io=1,Nrdm
-         write(unit,"(*(F20.16,1X))") (dreal(dm(io,jo)),jo=1,Nrdm)
-      enddo
-      write(unit,*)
-      !
-      if(any(dimag(dm)/=0d0))then
-         do io=1,Nrdm
-            write(unit,"(*(F20.16,1X))") (dimag(dm(io,jo)),jo=1,Nrdm)
-         enddo
-         write(unit,*)
-      endif
-      !
-      close(unit)
-      !
-   end subroutine ed_print_dm_orb
-   !
-   !
-   !
-   subroutine ed_print_dm_LEGACY(dm,Nrdm,ineq)
-      integer                  ,intent(in)            :: Nrdm
-      complex(8),dimension(:,:),intent(in)            :: dm
-      integer                  ,intent(in),optional   :: ineq
-      integer                                         :: unit,Nsites
-      character(len=64)                               :: fname
-      integer                                         :: io,jo
-      !
-      if(size(dm,1)/=Nrdm.OR.size(dm,2)/=Nrdm)then
-         stop "ERROR: actual dm argument has incogruent size wrt explicitly passed Nrdm"
-      endif
-      !
-      Nsites = nint( 1/Norb * log(real(Nrdm,kind=8)) / log(4d0) ) !Nrdm = 4**(Nsites*Norb)
-      !
-      if(present(ineq))then
-         fname = "reduced_density_matrix_"//reg(str(Nsites))//"sites_ineq"//reg(str(ineq))//".dat"
-      else
-         fname = "reduced_density_matrix_"//reg(str(Nsites))//"sites.dat"
-      endif
-      !
-      unit = free_unit()
-      open(unit,file=fname,action="write",position="rewind",status='unknown')
-      !
-      do io=1,Nrdm
-         write(unit,"(*(F20.16,1X))") (dreal(dm(io,jo)),jo=1,Nrdm)
-      enddo
-      write(unit,*)
-      !
-      if(any(dimag(dm)/=0d0))then
-         do io=1,Nrdm
-            write(unit,"(*(F20.16,1X))") (dimag(dm(io,jo)),jo=1,Nrdm)
-         enddo
-         write(unit,*)
-      endif
-      !
-      close(unit)
-      !
-   end subroutine ed_print_dm_LEGACY
-
-   !+------------------------------------------------------------------+
-   ! !                         PRINT CHI:
-   ! !+------------------------------------------------------------------+
-   ! subroutine ed_print_impChi
-   !   call print_chi_spin
-   !   call print_chi_dens
-   !   call print_chi_dens_mix
-   !   call print_chi_dens_tot
-   !   call print_chi_pair
-   ! end subroutine ed_print_impChi
-
-   ! !                         SPIN-SPIN
-   ! subroutine print_chi_spin
-   !   integer                               :: i,iorb
-   !   integer                               :: unit(3)
-   !   do iorb=1,Norb
-   !      call splot("spinChi_l"//str(iorb)//"_tau"//reg(ed_file_suffix)//".ed",tau,spinChi_tau(iorb,0:))
-   !      call splot("spinChi_l"//str(iorb)//"_realw"//reg(ed_file_suffix)//".ed",wr,spinChi_w(iorb,:))
-   !      call splot("spinChi_l"//str(iorb)//"_iw"//reg(ed_file_suffix)//".ed",vm,spinChi_iv(iorb,:))
-   !   enddo
-   !   if(Norb>1)then
-   !      iorb=Norb+1
-   !      call splot("spinChi_tot"//str(iorb)//"_tau"//reg(ed_file_suffix)//".ed",tau,spinChi_tau(iorb,0:))
-   !      call splot("spinChi_tot"//str(iorb)//"_realw"//reg(ed_file_suffix)//".ed",wr,spinChi_w(iorb,:))
-   !      call splot("spinChi_tot"//str(iorb)//"_iw"//reg(ed_file_suffix)//".ed",vm,spinChi_iv(iorb,:))
-   !   endif
-   ! end subroutine print_chi_spin
-
-   ! !                     DENSITY-DENSITY
-   ! subroutine print_chi_dens
-   !   integer                               :: i,j,iorb,jorb
-   !   integer                               :: unit(3),unit_mix
-   !   do iorb=1,Norb
-   !      do jorb=iorb,Norb
-   !         call splot("densChi_l"//str(iorb)//str(jorb)//"_tau"//reg(ed_file_suffix)//".ed",tau,densChi_tau(iorb,jorb,0:))
-   !         call splot("densChi_l"//str(iorb)//str(jorb)//"_realw"//reg(ed_file_suffix)//".ed",wr,densChi_w(iorb,jorb,:))
-   !         call splot("densChi_l"//str(iorb)//str(jorb)//"_iw"//reg(ed_file_suffix)//".ed",vm,densChi_iv(iorb,jorb,:))
-   !      enddo
-   !   enddo
-   ! end subroutine print_chi_dens
-
-   ! subroutine print_chi_dens_mix
-   !   integer                               :: i,j,iorb,jorb
-   !   integer                               :: unit(3),unit_mix
-   !   do iorb=1,Norb
-   !      do jorb=1,Norb
-   !         call splot("densChi_mix_l"//str(iorb)//str(jorb)//"_tau"//reg(ed_file_suffix)//".ed",tau,densChi_mix_tau(iorb,jorb,0:))
-   !         call splot("densChi_mix_l"//str(iorb)//str(jorb)//"_realw"//reg(ed_file_suffix)//".ed",wr,densChi_mix_w(iorb,jorb,:))
-   !         call splot("densChi_mix_l"//str(iorb)//str(jorb)//"_iw"//reg(ed_file_suffix)//".ed",vm,densChi_mix_iv(iorb,jorb,:))
-   !      enddo
-   !   enddo
-   ! end subroutine print_chi_dens_mix
-
-   ! subroutine print_chi_dens_tot
-   !   integer                               :: i,j,iorb,jorb
-   !   integer                               :: unit(3),unit_mix
-   !   call splot("densChi_tot_tau"//reg(ed_file_suffix)//".ed",tau,densChi_tot_tau(0:))
-   !   call splot("densChi_tot_realw"//reg(ed_file_suffix)//".ed",wr,densChi_tot_w(:))
-   !   call splot("densChi_tot_iw"//reg(ed_file_suffix)//".ed",vm,densChi_tot_iv(:))
-   ! end subroutine print_chi_dens_tot
-
-
-   ! !                             PAIR
-   ! subroutine print_chi_pair
-   !   integer                               :: i,iorb
-   !   integer                               :: unit(3)
-   !   do iorb=1,Norb
-   !      call splot("pairChi_orb"//str(iorb)//"_tau"//reg(ed_file_suffix)//".ed",tau,pairChi_tau(iorb,0:))
-   !      call splot("pairChi_orb"//str(iorb)//"_realw"//reg(ed_file_suffix)//".ed",wr,pairChi_w(iorb,:))
-   !      call splot("pairChi_orb"//str(iorb)//"_iw"//reg(ed_file_suffix)//".ed",vm,pairChi_iv(iorb,:))
-   !   enddo
-   ! end subroutine print_chi_pair
+  !+------------------------------------------------------------------+
+  !                      PRINT DENSITY MATRICES
+  !+------------------------------------------------------------------+
+  subroutine ed_print_dm_orb(dm,orbital_mask,ineq)
+    complex(8),dimension(:,:),intent(in)            :: dm
+    logical,dimension(Nlat,Norb),intent(in)         :: orbital_mask
+    integer                  ,intent(in),optional   :: ineq
+    integer                                         :: unit,Nsites
+    character(len=64)                               :: fname,suffix
+    integer                                         :: io,jo,Nrdm
+    integer,allocatable,dimension(:)                :: s1,s2,s3,s4
+    !
+    Nrdm = 4**count(orbital_mask)
+    !
+    if(size(dm,1)/=Nrdm.OR.size(dm,2)/=Nrdm)then
+       stop "ERROR: reduced density matrix and orbital mask have incompatible sizes"
+    endif
+    !
+    suffix = ""
+    do io = 1,Nlat
+       do jo = 1,Norb
+          if(orbital_mask(io,jo))then
+             suffix = trim(suffix)//"_i"//reg(str(io))//"l"//reg(str(jo))
+          endif
+       enddo
+    enddo
+    if(present(ineq))then
+       fname = "reduced_density_matrix"//trim(suffix)//"_ineq"//reg(str(ineq))//".dat"
+    else
+       fname = "reduced_density_matrix"//trim(suffix)//".dat"
+    endif
+    !
+    unit = free_unit()
+    open(unit,file=fname,action="write",position="rewind",status='unknown')
+    !
+    do io=1,Nrdm
+       write(unit,"(*(F20.16,1X))") (dreal(dm(io,jo)),jo=1,Nrdm)
+    enddo
+    write(unit,*)
+    !
+    if(any(dimag(dm)/=0d0))then
+       do io=1,Nrdm
+          write(unit,"(*(F20.16,1X))") (dimag(dm(io,jo)),jo=1,Nrdm)
+       enddo
+       write(unit,*)
+    endif
+    !
+    close(unit)
+    !
+  end subroutine ed_print_dm_orb
+  !
+  !
+  !
+  subroutine ed_print_dm_LEGACY(dm,Nrdm,ineq)
+    integer                  ,intent(in)            :: Nrdm
+    complex(8),dimension(:,:),intent(in)            :: dm
+    integer                  ,intent(in),optional   :: ineq
+    integer                                         :: unit,Nsites
+    character(len=64)                               :: fname
+    integer                                         :: io,jo
+    !
+    if(size(dm,1)/=Nrdm.OR.size(dm,2)/=Nrdm)then
+       stop "ERROR: actual dm argument has incogruent size wrt explicitly passed Nrdm"
+    endif
+    !
+    Nsites = nint( 1/Norb * log(real(Nrdm,kind=8)) / log(4d0) ) !Nrdm = 4**(Nsites*Norb)
+    !
+    if(present(ineq))then
+       fname = "reduced_density_matrix_"//reg(str(Nsites))//"sites_ineq"//reg(str(ineq))//".dat"
+    else
+       fname = "reduced_density_matrix_"//reg(str(Nsites))//"sites.dat"
+    endif
+    !
+    unit = free_unit()
+    open(unit,file=fname,action="write",position="rewind",status='unknown')
+    !
+    do io=1,Nrdm
+       write(unit,"(*(F20.16,1X))") (dreal(dm(io,jo)),jo=1,Nrdm)
+    enddo
+    write(unit,*)
+    !
+    if(any(dimag(dm)/=0d0))then
+       do io=1,Nrdm
+          write(unit,"(*(F20.16,1X))") (dimag(dm(io,jo)),jo=1,Nrdm)
+       enddo
+       write(unit,*)
+    endif
+    !
+    close(unit)
+    !
+  end subroutine ed_print_dm_LEGACY
 
 
 
 
 
 
-
-
-
-
-   ! PURPOSE: Read self-energy function(s) - also for inequivalent sites.
-   !+-----------------------------------------------------------------------------+!
-   subroutine ed_read_impSigma_single
-      integer                                           :: i,ispin,isign,unit(2),iorb,jorb,ilat,jlat
-      character(len=30)                                 :: suffix
-      integer,dimension(:),allocatable                  :: getIorb,getJorb
-      integer                                           :: totNorb,l
-      !
-      if(.not.allocated(wm))allocate(wm(Lmats))
-      if(.not.allocated(wr))allocate(wr(Lreal))
-      wm     = pi/beta*real(2*arange(1,Lmats)-1,8)
-      wr     = linspace(wini,wfin,Lreal)
-      !
-      !!
-      !Print the impurity functions:
-      do ispin=1,Nspin
-         do ilat=1,Nlat
-            do jlat=1,Nlat
-               do iorb=1,Norb
-                  do jorb=1,Norb
-                     suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
-                     call sread("impSigma"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed"   ,wm,impSmats(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                     call sread("impSigma"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,impSreal(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                  enddo
-               enddo
-            enddo
-         enddo
-      enddo
-      !
-      if(allocated(wm))deallocate(wm)
-      if(allocated(wr))deallocate(wr)
-      !
-   end subroutine ed_read_impSigma_single
-
-#if __GFORTRAN__ &&  __GNUC__ > 8
-
-   subroutine ed_read_impSigma_lattice(Nineq)
-      integer :: Nineq
-      integer :: isites
-      !
-      if(allocated(Smats_ineq))deallocate(Smats_ineq)
-      if(allocated(Sreal_ineq))deallocate(Sreal_ineq)
-      !
-      allocate(Smats_ineq(Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-      allocate(Sreal_ineq(Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-      !
-      Smats_ineq  = zero
-      Sreal_ineq  = zero
-      !
-      do isites=1,Nineq
-         ed_file_suffix=reg(ineq_site_suffix)//str(isites,site_indx_padding)
-         call ed_read_impSigma_single
-         Smats_ineq(isites,:,:,:,:,:,:,:)  = impSmats
-         Sreal_ineq(isites,:,:,:,:,:,:,:)  = impSreal
-      enddo
-      ed_file_suffix=""
-   end subroutine ed_read_impSigma_lattice
-
-#endif
-
-   subroutine ed_read_impG_single
-      integer                                           :: i,ispin,isign,unit(2),iorb,jorb,ilat,jlat
-      character(len=30)                                 :: suffix
-      integer,dimension(:),allocatable                  :: getIorb,getJorb
-      integer                                           :: totNorb,l
-      !
-      if(.not.allocated(wm))allocate(wm(Lmats))
-      if(.not.allocated(wr))allocate(wr(Lreal))
-      wm     = pi/beta*real(2*arange(1,Lmats)-1,8)
-      wr     = linspace(wini,wfin,Lreal)
-      !
-      !Print the impurity functions:
-      do ispin=1,Nspin
-         do ilat=1,Nlat
-            do jlat=1,Nlat
-               do iorb=1,Norb
-                  do jorb=1,Norb
-                     suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
-                     call sread("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed"   ,wm,impGmats(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                     call sread("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,impGreal(ilat,jlat,ispin,ispin,iorb,jorb,:))
-                  enddo
-               enddo
-            enddo
-         enddo
-      enddo
-      !
-      if(allocated(wm))deallocate(wm)
-      if(allocated(wr))deallocate(wr)
-      !
-   end subroutine ed_read_impG_single
-
-#if __GFORTRAN__ &&  __GNUC__ > 8
-
-   subroutine ed_read_impG_lattice(Nineq)
-      integer :: Nineq
-      integer :: isites
-      !
-      if(allocated(Gmats_ineq))deallocate(Gmats_ineq)
-      if(allocated(Greal_ineq))deallocate(Greal_ineq)
-      !
-      allocate(Gmats_ineq(Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-      allocate(Greal_ineq(Nineq,Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-      !
-      Gmats_ineq  = zero
-      Greal_ineq  = zero
-      !
-      do isites=1,Nineq
-         ed_file_suffix=reg(ineq_site_suffix)//str(isites,site_indx_padding)
-         call ed_read_impG_single
-         Gmats_ineq(isites,:,:,:,:,:,:,:)  = impGmats
-         Greal_ineq(isites,:,:,:,:,:,:,:)  = impGreal
-      enddo
-      ed_file_suffix=""
-   end subroutine ed_read_impG_lattice
-
-#endif
+  
 
 END MODULE ED_IO
 

@@ -1,59 +1,95 @@
 MODULE ED_GREENS_FUNCTIONS
-   USE ED_GF_SHARED
-   USE ED_GF_NORMAL
-   !USE ED_GF_CHISPIN
-   !
-   implicit none
-   private
-
-   public :: buildGf_impurity
-   !public :: buildChi_impurity
+  USE ED_GF_NORMAL
+  !
+  implicit none
+  private
 
 
-   real(8),dimension(:,:,:),allocatable            :: zimp,simp
+  interface get_Gimp
+     module procedure :: get_Gimp_scalar
+     module procedure :: get_Gimp_array
+  end interface get_Gimp
 
+  interface get_Sigma
+     module procedure :: get_Sigma_scalar
+     module procedure :: get_Sigma_array
+  end interface get_Sigma
+
+
+
+  public :: buildGf_impurity
+  public :: get_Gimp
+  public :: get_Sigma
 
 contains
 
 
 
-   !+------------------------------------------------------------------+
-   ! GF CALCULATIONS
-   !+------------------------------------------------------------------+
-   subroutine buildGF_impurity()
-      !
-      call allocate_grids
-      !
-      impGmats=zero
-      impGreal=zero
-      !
-      impSmats = zero
-      impSreal = zero
-      !
-      impG0mats=zero
-      impG0real=zero
-      !
-      !
-      write(LOGfile,"(A)")"Get impurity Greens functions:"
-      call build_gf_normal()
-      call build_sigma_normal()
-      !
-      if(MPIMASTER)then
-         if(ed_print_Sigma)call ed_print_impSigma()
-         if(ed_print_G)call ed_print_impG()
-         if(ed_print_G0)call ed_print_impG0()
-      endif
-      !
-      if(MPIMASTER)then
-         allocate(simp(Nlat,Norb,Nspin),zimp(Nlat,Norb,Nspin))
-         call get_szr()
-         call write_szr()
-         deallocate(simp,zimp)
-      endif
-      !
-      call deallocate_grids
-      !
-   end subroutine buildgf_impurity
+  !+------------------------------------------------------------------+
+  ! GF CALCULATIONS
+  !+------------------------------------------------------------------+
+  subroutine buildGF_impurity()
+    !
+    !
+    write(LOGfile,"(A)")"Get impurity Greens functions:"
+    select case(ed_mode)
+    case default  ;call build_gf_normal()
+    case("superc");call build_gf_superc()
+    end select
+    !
+    if(MPIMASTER)then
+       if(ed_print_Sigma)call ed_print_impSigma()
+       if(ed_print_G)call ed_print_impG()
+       if(ed_print_G0)call ed_print_impG0()
+       call write_szr()
+    endif
+    !
+  end subroutine buildGF_impurity
+
+
+
+
+
+
+  function get_Gimp_scalar(zeta) result(Gf)
+    complex(8),intent(in)                                   :: zeta
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: Gf
+    select case(ed_mode)
+    case default  ;Gf = get_gimp_normal(zeta)
+    case("superc");Gf = get_gimp_superc(zeta)
+    end select
+  end function get_Gimp_scalar
+
+  function get_Gimp_array(zeta)
+    complex(8),dimension(:),intent(in)                                 :: zeta
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Gf
+    select case(ed_mode)
+    case default  ;Gf = get_gimp_normal(zeta)
+    case("superc");Gf = get_gimp_superc(zeta)
+    end select
+  end function get_Gimp_array
+
+
+
+
+
+  function get_Sigma_scalar(zeta) result(Gf)
+    complex(8),intent(in)                                   :: zeta
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: Gf
+    select case(ed_mode)
+    case default  ;Gf = get_Sigma_normal(zeta)
+    case("superc");Gf = get_Sigma_superc(zeta)
+    end select
+  end function get_Sigma_scalar
+
+  function get_Sigma_array(zeta)
+    complex(8),dimension(:),intent(in)                                 :: zeta
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Gf
+    select case(ed_mode)
+    case default  ;Gf = get_Sigma_normal(zeta)
+    case("superc");Gf = get_Sigma_superc(zeta)
+    end select
+  end function get_Sigma_array
 
 
 
@@ -62,114 +98,189 @@ contains
 
 
 
-   !+------------------------------------------------------------------+
-   ! SUSCEPTIBILITY CALCULATIONS
-   !+------------------------------------------------------------------+
-   !subroutine buildChi_impurity()
-   !!
-   !call allocate_grids
-   !!
-   !!
-   !!BUILD SPIN SUSCEPTIBILITY
-   !spinChi_tau=zero
-   !spinChi_w=zero
-   !spinChi_iv=zero
-   !call build_chi_spin()
-   !!
-   !!
-   !! !BUILD CHARGE SUSCEPTIBILITY
-   !! densChi_tau=zero
-   !! densChi_w=zero
-   !! densChi_iv=zero
-   !! densChi_mix_tau=zero
-   !! densChi_mix_w=zero
-   !! densChi_mix_iv=zero
-   !! densChi_tot_tau=zero
-   !! densChi_tot_w=zero
-   !! densChi_tot_iv=zero
-   !! call build_chi_dens()
-   !!
-   !!
-   !! !BUILD PAIR SUSCEPTIBILITY
-   !! pairChi_tau=zero
-   !! pairChi_w=zero
-   !! pairChi_iv=zero
-   !! call build_chi_pair()
-   !!
-   !!
-   !!PRINTING:
-   !if(MPIMASTER)call ed_print_impChi()
-   !!
-   !!
-   !call deallocate_grids
-   !!
-   !end subroutine buildChi_impurity
+  !+------------------------------------------------------------------+
+  !                         PRINT SIGMA:
+  !+------------------------------------------------------------------+
+  subroutine ed_print_impSigma
+    character(len=64)                                             :: suffix
+    integer                                                       :: i,ilat,jlat,iorb,jorb,ispin,io,jo
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats) :: Smats
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal) :: Sreal
+    !
+    call allocate_grids
+    !
+    Smats = get_Sigma(dcmplx(0d0,wm(:)))
+    Sreal = get_Sigma(dcmplx(wr(:),eps))
+    !
+    select case(ed_mode)
+    case default
+       do concurrent(ispin=1:Nspin,ilat=1:Nlat,jlat=1:Nlat,iorb=1:Norb,jorb=1:Norb)
+          io = iorb + (ilat-1)*Norb
+          jo = jorb + (jlat-1)*Norb
+          suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
+          call splot("impSigma"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Smats(1,1,ispin,ispin,io,jo,:))
+          call splot("impSigma"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Sreal(1,1,ispin,ispin,io,jo,:))
+       enddo
+    case("superc")
+       do concurrent(ispin=1:Nspin,ilat=1:Nlat,jlat=1:Nlat,iorb=1:Norb,jorb=1:Norb)
+          io = iorb + (ilat-1)*Norb
+          jo = jorb + (jlat-1)*Norb
+          suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
+          call splot("impSigma"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Smats(1,1,ispin,ispin,io,jo,:))
+          call splot("impSelf"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Smats(1,2,ispin,ispin,io,jo,:))
+          call splot("impSigma"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Sreal(1,1,ispin,ispin,io,jo,:))
+          call splot("impSelf"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Sreal(1,2,ispin,ispin,io,jo,:))
+       enddo
+    end select
+    !
+    call deallocate_grids
+    !
+  end subroutine ed_print_impSigma
+
+
+
+  subroutine ed_print_impG
+    character(len=64)                                             :: suffix
+    integer                                                       :: i,ilat,jlat,iorb,jorb,ispin,io,jo
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats) :: Gmats
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal) :: Greal
+    !
+    call allocate_grids
+    !
+    Gmats = get_Gimp(dcmplx(0d0,wm(:)))
+    Greal = get_Gimp(dcmplx(wr(:),eps))
+    !
+    select case(ed_mode)
+    case default
+       do concurrent(ispin=1:Nspin,ilat=1:Nlat,jlat=1:Nlat,iorb=1:Norb,jorb=1:Norb)
+          io = iorb + (ilat-1)*Norb
+          jo = jorb + (jlat-1)*Norb
+          suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
+          call splot("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
+          call splot("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
+       enddo
+    case("superc")
+       do concurrent(ispin=1:Nspin,ilat=1:Nlat,jlat=1:Nlat,iorb=1:Norb,jorb=1:Norb)
+          io = iorb + (ilat-1)*Norb
+          jo = jorb + (jlat-1)*Norb
+          suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
+          call splot("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
+          call splot("impF"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,2,ispin,ispin,io,jo,:))
+          call splot("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
+          call splot("impF"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,2,ispin,ispin,io,jo,:))
+       enddo
+    end select
+    !
+    call deallocate_grids
+    !
+  end subroutine ed_print_impG
+
+
+
+  !+------------------------------------------------------------------+
+  !                         PRINT G0
+  !+------------------------------------------------------------------+
+  subroutine ed_print_impG0
+    character(len=64)                                             :: suffix
+    integer                                                       :: i,ilat,jlat,iorb,jorb,ispin,io,jo
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats) :: Gmats
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal) :: Greal
+    !
+    call allocate_grids
+    !
+    Gmats = g0and_bath_function(dcmplx(0d0,wm(:)),dmft_bath)
+    Greal = g0and_bath_function(dcmplx(wr(:),eps),dmft_bath)
+    !
+    select case(ed_mode)
+    case default
+       do concurrent(ispin=1:Nspin,ilat=1:Nlat,jlat=1:Nlat,iorb=1:Norb,jorb=1:Norb)
+          io = iorb + (ilat-1)*Norb
+          jo = jorb + (jlat-1)*Norb
+          suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
+          call splot("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
+          call splot("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
+       enddo
+    case("superc")
+       do concurrent(ispin=1:Nspin,ilat=1:Nlat,jlat=1:Nlat,iorb=1:Norb,jorb=1:Norb)
+          io = iorb + (ilat-1)*Norb
+          jo = jorb + (jlat-1)*Norb
+          suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
+          call splot("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
+          call splot("impF"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,2,ispin,ispin,io,jo,:))
+          call splot("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
+          call splot("impF"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,2,ispin,ispin,io,jo,:))
+       enddo
+    end select
+    !
+    call deallocate_grids
+    !
+  end subroutine ed_print_impG0
 
 
 
 
-   !+-------------------------------------------------------------------+
-   !PURPOSE  : get scattering rate and renormalization constant Z
-   !+-------------------------------------------------------------------+
-   subroutine get_szr()
-      integer                  :: ilat,ispin,iorb
-      real(8)                  :: wm1,wm2
-      wm1 = pi/beta ; wm2=3d0*pi/beta
-      do ilat=1,Nlat
-         do ispin=1,Nspin
-            do iorb=1,Norb
-               simp(ilat,iorb,ispin) = dimag(impSmats(ilat,ilat,ispin,ispin,iorb,iorb,1)) - &
-                  wm1*(dimag(impSmats(ilat,ilat,ispin,ispin,iorb,iorb,2))-dimag(impSmats(ilat,ilat,ispin,ispin,iorb,iorb,1)))/(wm2-wm1)
-               zimp(ilat,iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(impSmats(ilat,ilat,ispin,ispin,iorb,iorb,1))/wm1 ))
-            enddo
-         enddo
-      enddo
-   end subroutine get_szr
 
 
 
 
-   !+-------------------------------------------------------------------+
-   !PURPOSE  : write observables to file
-   !+-------------------------------------------------------------------+
-   subroutine write_szr()
-      integer :: unit
-      integer :: iorb,jorb,ispin,ilat
-      !
-      open(free_unit(unit),file="zeta_info.ed")
-      write(unit,"(A1,90(A10,6X))")"#",&
-         ((reg(txtfy(iorb+(ispin-1)*Norb))//"z_"//reg(txtfy(iorb))//"s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-      close(unit)
-      !
-      open(free_unit(unit),file="sig_info.ed")
-      write(unit,"(A1,90(A10,6X))")"#",&
-         ((reg(txtfy(iorb+(ispin-1)*Norb))//"sig_"//reg(txtfy(iorb))//"s"//reg(txtfy(ispin)),iorb=1,Norb),ispin=1,Nspin)
-      close(unit)
-      !
-      do ilat=1,Nlat
-         open(free_unit(unit),file="zeta_all"//reg(ed_file_suffix)//"_site"//str(ilat,3)//".ed",position='append')
-         write(unit,"(90(F15.9,1X))")&
-            ((zimp(ilat,iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
-         close(unit)
-         open(free_unit(unit),file="zeta_last"//reg(ed_file_suffix)//"_site"//str(ilat,3)//".ed")
-         write(unit,"(90(F15.9,1X))")&
-            ((zimp(ilat,iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
-         close(unit)
-         !
-         open(free_unit(unit),file="sig_all"//reg(ed_file_suffix)//"_site"//str(ilat,3)//".ed",position='append')
-         write(unit,"(90(F15.9,1X))")&
-            ((simp(ilat,iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
-         close(unit)
-         open(free_unit(unit),file="sig_last"//reg(ed_file_suffix)//"_site"//str(ilat,3)//".ed")
-         write(unit,"(90(F15.9,1X))")&
-            ((simp(ilat,iorb,ispin),iorb=1,Norb),ispin=1,Nspin)
-         close(unit)
-      enddo
-      !
-   end subroutine write_szr
-
-
-
-
+  !+-------------------------------------------------------------------+
+  !PURPOSE  : write observables to file
+  !+-------------------------------------------------------------------+
+  subroutine write_szr()
+    integer                                                 :: unit
+    integer                                                 :: iorb,jorb,ispin,ilat
+    integer                                                 :: ilat,ispin,iorb
+    real(8)                                                 :: wm1,wm2
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: Smats1,Smats2
+    real(8),dimension(Nspin,Nimp)                           :: zimp,simp
+    !
+    wm1 = pi/beta ; wm2=3d0*pi/beta
+    !
+    select case(ed_mode)
+    case default;
+       Smats1 = get_Sigma_normal(dcmplx(0d0,wm1))
+       Smats2 = get_Sigma_normal(dcmplx(0d0,wm2))
+    case ("superc")
+       Smats1 = get_Sigma_superc(dcmplx(0d0,wm1))
+       Smats2 = get_Sigma_superc(dcmplx(0d0,wm2))
+    end select
+    !
+    do ispin=1,Nspin
+       do iorb=1,Nimp
+          simp(ispin,iorb) = dimag(Smats1(1,1,ispin,ispin,iorb,iorb)) - &
+               wm1*(dimag(Smats2(1,1,ispin,ispin,iorb,iorb))-dimag(Smats1(1,1,ispin,ispin,iorb,iorb)))/(wm2-wm1)
+          zimp(ilat,iorb,ispin)   = 1.d0/( 1.d0 + abs( dimag(Smats1(1,1,ispin,ispin,iorb,iorb))/wm1 ))
+       enddo
+    enddo
+    !
+    open(free_unit(unit),file="zeta_info.ed")
+    write(unit,"(A1,90(A10,6X))")"#",&
+         ((reg(txtfy(iorb+(ispin-1)*Nimp))//"z_"//reg(txtfy(iorb))//"s"//reg(txtfy(ispin)),iorb=1,Nimp),ispin=1,Nspin)
+    close(unit)
+    !
+    open(free_unit(unit),file="sig_info.ed")
+    write(unit,"(A1,90(A10,6X))")"#",&
+         ((reg(txtfy(iorb+(ispin-1)*Nimp))//"sig_"//reg(txtfy(iorb))//"s"//reg(txtfy(ispin)),iorb=1,Nimp),ispin=1,Nspin)
+    close(unit)
+    !
+    open(free_unit(unit),file="zeta_all"//reg(ed_file_suffix)//".ed",position='append')
+    write(unit,"(90(F15.9,1X))")&
+         ((zimp(ispin,iorb),iorb=1,Nimp),ispin=1,Nspin)
+    close(unit)
+    open(free_unit(unit),file="zeta_last"//reg(ed_file_suffix)//".ed")
+    write(unit,"(90(F15.9,1X))")&
+         ((zimp(ispin,iorb),iorb=1,Nimp),ispin=1,Nspin)
+    close(unit)
+    !
+    open(free_unit(unit),file="sig_all"//reg(ed_file_suffix)//".ed",position='append')
+    write(unit,"(90(F15.9,1X))")&
+         ((simp(ispin,iorb),iorb=1,Nimp),ispin=1,Nspin)
+    close(unit)
+    open(free_unit(unit),file="sig_last"//reg(ed_file_suffix)//".ed")
+    write(unit,"(90(F15.9,1X))")&
+         ((simp(ispin,iorb),iorb=1,Nimp),ispin=1,Nspin)
+    close(unit)
+    !
+  end subroutine write_szr
 
 end MODULE ED_GREENS_FUNCTIONS

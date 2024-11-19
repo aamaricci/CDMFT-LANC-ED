@@ -77,9 +77,6 @@ contains
        Nambu    = 2
     end select
     !
-    Nlso   = Nspin*Nimp
-    Ntot   = Nambu*Nspin*Nimp
-    !
   end subroutine ed_setup_dimensions
 
 
@@ -117,8 +114,9 @@ contains
        write(LOGfile,"(A)")"--------------------------------------------"
        write(LOGfile,"(A,I15)")'# of levels/spin      = ',Ns
        write(LOGfile,"(A,I15)")'Total size            = ',2*Ns
+       write(LOGfile,"(A,I15)")'# of orbitals         = ',Norb
        write(LOGfile,"(A,I15)")'# of sites            = ',Nlat
-       write(LOGfile,"(A,I15)")'# of impurities       = ',Norb
+       write(LOGfile,"(A,I15)")'# of impurities       = ',Nimp
        write(LOGfile,"(A,I15)")'# of bath/impurity    = ',Nbath
        write(LOGfile,"(A,I15)")'Number of sectors     = ',Nsectors
        select case(ed_mode)
@@ -150,7 +148,7 @@ contains
     allocate(getDim(Nsectors));getDim=0
     allocate(getSz(Nsectors));getSz=0
     !
-    allocate(getBathStride(Nlat,Norb,Nbath));getBathStride=0
+    allocate(getBathStride(Nimp,Nbath));getBathStride=0
     allocate(twin_mask(Nsectors))
     allocate(sectors_mask(Nsectors))
     allocate(neigen_sector(Nsectors))
@@ -185,20 +183,15 @@ contains
     if(Norb>1.AND.(Jx/=0d0.OR.Jp/=0d0))Jhflag=.TRUE.
     !
     !
-    offdiag_gf_flag=.true.
-    !
     if(nread/=0.d0)then
        i=abs(floor(log10(abs(nerr)))) !modulus of the order of magnitude of nerror
        niter=nloop/3
     endif
 
     !ALLOCATE impHloc
-    if(.not.allocated(impHloc))then
-       allocate(impHloc(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp))
-       impHloc=zero
-    else
-       call assert_shape(impHloc,[Nambu,Nambu,Nspin,Nspin,Nimp,Nimp],"init_ed_structure","impHloc")
-    endif
+    if(allocated(impHloc))deallocate(impHloc)
+    allocate(impHloc(Nspin,Nspin,Nimp,Nimp))
+    impHloc=zero
     !
     !
     !allocate functions
@@ -397,12 +390,10 @@ contains
        write(LOGfile,"(A,I6,A,I9)")"Looking into ",count(twin_mask)," sectors out of ",Nsectors
     endif
     !
-    stride=Nlat*Norb
+    stride=Nimp
     do ibath=1,Nbath
-       do ilat=1,Nlat
-          do iorb=1,Norb
-             getBathStride(ilat,iorb,ibath) = stride + imp_state_index(ilat,iorb) + (ibath-1)*Nlat*Norb
-          enddo
+       do iorb=1,Nimp
+          getBathStride(iorb,ibath) = Nimp +  (ibath-1)*Nimp + iorb !==ibath*Nimp + iorb
        enddo
     enddo
     !
@@ -512,12 +503,10 @@ contains
        write(LOGfile,"(A,I4,A,I4)")"Looking into ",count(twin_mask)," sectors out of ",Nsectors
     endif
     !
-    stride=Nlat*Norb
+    stride=Nimp
     do ibath=1,Nbath
-       do ilat=1,Nlat
-          do iorb=1,Norb
-             getBathStride(ilat,iorb,ibath) = stride + imp_state_index(ilat,iorb) + (ibath-1)*Nlat*Norb
-          enddo
+       do iorb=1,Nimp
+          getBathStride(iorb,ibath) = Nimp + (ibath-1)*Nimp + iorb !iorb + i*Norb see above normal case
        enddo
     enddo
     !    

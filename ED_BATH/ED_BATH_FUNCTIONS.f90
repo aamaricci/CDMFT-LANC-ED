@@ -10,8 +10,6 @@ MODULE ED_BATH_FUNCTIONS
 
   private
 
-
-
   !\DELTA, THE HYBRIDIZATION FUNCTION
   interface delta_bath_function
      !
@@ -22,18 +20,6 @@ MODULE ED_BATH_FUNCTIONS
      !
      module procedure delta_bath_array
   end interface delta_bath_function
-
-  interface Fdelta_bath_function
-     !
-     ! Evaluates the anomalouse hybridization function :math:`\Theta(x)`.
-     !
-     ! Output:
-     !   * :f:var:`fdelta` : complex rank-5 array with dimension [ |Nlat| , |Nlat| , |Nns| , |Nns| , |Norb| , |Norb| , :code:`size(x)` ]
-     !
-     module procedure Fdelta_bath_array
-  end interface Fdelta_bath_function
-
-
 
 
   !NON-INTERACTING GREEN'S FUNCTION 
@@ -47,18 +33,6 @@ MODULE ED_BATH_FUNCTIONS
      module procedure g0and_bath_array
   end interface g0and_bath_function
 
-  interface f0and_bath_function
-     !
-     ! Evaluates the anomalous non-interacting Green's function :math:`F_0(x)`.
-     !
-     ! Output:
-     !   * :f:var:`f0and` : complex rank-5 array with dimension [ |Nlat| , |Nlat| , |Nns| , |Nns| , |Norb| , |Norb| , :code:`size(x)` ]
-     !
-     module procedure f0and_bath_array
-  end interface f0and_bath_function
-
-
-
   !INVERSE NON-INTERACTING GREEN'S FUNCTION 
   interface invg0_bath_function
      !
@@ -70,41 +44,40 @@ MODULE ED_BATH_FUNCTIONS
      module procedure invg0_bath_array
   end interface invg0_bath_function
 
-  interface invf0_bath_function
-     !
-     ! Evaluates the inverse of the anomalous non-interacting Green's function :math:`F^{-1}_0(x)`.
-     !
-     ! Output:
-     !   * :f:var:`f0and` : complex rank-5 array with dimension [ |Nlat| , |Nlat| , |Nns| , |Nns| , |Norb| , |Norb| , :code:`size(x)` ]
-     !
-     module procedure invf0_bath_array
-  end interface invf0_bath_function
 
 
-  public :: delta_bath_function,fdelta_bath_function
-  public :: g0and_bath_function,f0and_bath_function
-  public :: invg0_bath_function,invf0_bath_function
+
+  public :: delta_bath_function
+  public :: g0and_bath_function
+  public :: invg0_bath_function
 
 
+
+
+
+  integer :: ibath
+  integer :: inam,jnam
+  integer :: ilat,jlat
+  integer :: iorb,jorb
+  integer :: ispin,jspin
+  integer :: is,js
+  integer :: io,jo
+  integer :: i,j
+  integer :: L,Ntot
 
 contains
 
 
 
   function delta_bath_array(x,dmft_bath_,axis) result(Delta)
-    complex(8),dimension(:),intent(in)                            :: x          !complex  array for the frequency
-    type(effective_bath)                                          :: dmft_bath_ !the current :f:var:`effective_bath` instance
-    character(len=*),optional                                     :: axis       !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb,size(x)) :: Delta
-    integer                                                       :: i,ih,L
-    integer                                                       :: ilat,jlat,iorb,jorb,ispin,jspin,ibath
-    integer                                                       :: io,jo
-    !
-    complex(8),dimension(Nlat*Nns*Norb,Nlat*Nns*Norb,size(x))     :: zeta
-    complex(8),dimension(Nlat*Nns*Norb,Nlat*Nns*Norb)             :: Vk
-    complex(8),dimension(Nlat*Nns*Norb,Nlat*Nns*Norb)             :: invH_k
-    complex(8),dimension(Nlat,Nlat,Nns,Nns,Norb,Norb)             :: invH_knn
-    character(len=4)                                              :: axis_
+    complex(8),dimension(:),intent(in)                              :: x          !complex  array for the frequency
+    type(effective_bath)                                            :: dmft_bath_ !the current :f:var:`effective_bath` instance
+    character(len=*),optional                                       :: axis       !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(x)) :: Delta
+    ! complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)         :: JJ
+    complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)         :: Vk
+    complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)         :: Hk,invHk
+    character(len=4)                                                :: axis_
     !
     axis_="mats";if(present(axis))axis_=str(axis)
     !
@@ -112,248 +85,153 @@ contains
     Delta=zero
     !
     L    = size(x)
+    Ntot = Nambu*Nspin*Nimp
     !
     select case(bath_type)
     case default
-       invH_k=zero
-       do i=1,L
-          do ibath=1,Nbath
-             Vk       = dzdiag(dmft_bath%item(ibath)%v(:))
-             invH_knn = Hbath_build(dmft_Bath%item(ibath)%lambda)
-             invH_k   = nnn2lso_reshape(invH_knn,Nlat,Nspin,Norb)
-             invH_k   = zeye(Nlat*Nspin*Norb)*x(i) - invH_k
-             call inv(invH_k)
-             invH_k   = matmul(matmul(Vk,invH_k),Vk)
-             invH_knn = lso2nnn_reshape(invH_k,Nlat,Nspin,Norb)
-             Delta(:,:,:,:,:,:,i)=Delta(:,:,:,:,:,:,i) + invH_knn
+       if(Nambu/=1)stop "delta_bath_array ERROR: Nambu != 1 with ed_mode=normal"
+       do ibath=1,Nbath
+          Vk = one*diag(dmft_bath%item(ibath)%v(:))
+          Hk = nnn2nso_reshape(Hbath_build(dmft_Bath%item(ibath)%lambda)) !rank6 -> rank2
+          do i=1,L
+             invHk = zeye(Ntot)*x(i) - Hk
+             call inv(invHk)
+             invHk = matmul(matmul(Vk,invHk),Vk)
+             Delta(:,:,:,:,:,:,i)=Delta(:,:,:,:,:,:,i) + nso2nnn_reshape(invHk)
           enddo
        enddo
-    case ("superc")
-       JJ=kron(pauli_sigma_z,zeye(Nlat*Norb))
-       do i=1,L
-          select case(axis_)
-          case default ; zeta(:,:,i) = x(i)*zeye(Nlat*Nns*Norb)
-          case ('real'); zeta(:,:,i) = x(i)*JJ
-          end select
-          do ibath=1,Nbath
-             Vk       = kron(pauli_sigma_z,dzdiag(dmft_bath_%item(ibath)%v(:)))
-             invH_knn = Hbath_build(dmft_bath_%item(ibath)%lambda)
-             invH_k   = nnn2lso_reshape(invH_knn,Nlat,Nns,Norb)
-             invH_k   = zeta(:,:,i) - invH_k
-             call inv(invH_k)
-             invH_k   = matmul(matmul(Vk,invH_k),Vk)
-             invH_knn = lso2nnn_reshape(invH_k,Nlat,Nns,Norb)
-             Delta(:,:,:,:,:,:,i)=Delta(:,:,:,:,:,:,i) + invH_knn(:,:,1,1,:,:) !get component normal 11
+    case ("superc")             !treat all the 2x2 Nambu components at once
+       if(Nambu/=2)stop "delta_bath_array ERROR: Nambu != 2 with ed_mode=superc"
+       ! select case(axis_)
+       ! case default ; JJ=zeye(Ntot)
+       ! case ('real'); JJ=kron(pauli_sigma_z,zeye(Nspin*Nimp))
+       ! end select
+       do ibath=1,Nbath
+          Vk = kron(pauli_sigma_z,one*diag(dmft_bath_%item(ibath)%v(:)))
+          Hk = nnn2nso_reshape(Hbath_build(dmft_Bath%item(ibath)%lambda)) !rank6 -> rank2          
+          do i=1,L
+             invHk   = diag(zeta_superc(x,0d0,axis_)) - Hk !x(i)*JJ - Hk
+             call inv(invHk)
+             invHk   = matmul(matmul(Vk,invHk),Vk)
+             Delta(:,:,:,:,:,:,i) = Delta(:,:,:,:,:,:,i) + nso2nnn_reshape(invHk)
           enddo
        enddo
     end select
-    !
+    !>ENFORCE SYMMETRY HERE?
+    !D(2,1,:,:,:,:) = conjg(D(1,2,:,:,:,:)) (or dagger?)
+    !D(2,2,:,:,:,:) = -conjg(D(1,1,:,:,:,:/L:1:-1))
   end function delta_bath_array
 
 
 
-  function fdelta_bath_array(x,dmft_bath_,axis) result(Fdelta)
-    complex(8),dimension(:),intent(in)                                          :: x          !complex  array for the frequency
-    type(effective_bath)                                                        :: dmft_bath_ !the current :f:var:`effective_bath` instance
-    character(len=*),optional                                                   :: axis       !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb,size(x))               :: Fdelta
-    integer                                                                     :: i,ih,L
-    integer                                                                     :: ilat,jlat,iorb,jorb,ispin,jspin,ibath
-    integer                                                                     :: io,jo
-    !
-    complex(8),dimension(Nlat*Nns*Norb,Nlat*Nns*Norb,size(x)) :: zeta
-    complex(8),dimension(Nlat*Nns*Norb,Nlat*Nns*Norb)         :: Vk
-    complex(8),dimension(Nlat*Nns*Norb,Nlat*Nns*Norb)         :: invH_k
-    complex(8),dimension(Nlat,Nlat,Nns,Nns,Norb,Norb)         :: invH_knn
-    character(len=4)                                                            :: axis_
-    !
-    axis_="mats";if(present(axis))axis_=str(axis)
-    !
-    !
-    Delta=zero
-    !
-    L    = size(x)
-    !
-    select case(ed_mode)
-    case default
-       stop "Fdelta_bath_array ERROR: called with ed_mode=normal."
-    case ("superc")
-       JJ=kron(pauli_sigma_z,zeye(Nlat*Norb))
-       do i=1,L
-          select case(axis_)
-          case default ; zeta(:,:,i) = x(i)*zeye(Nlat*Nns*Norb)
-          case ('real'); zeta(:,:,i) = x(i)*JJ
-          end select
-          do ibath=1,Nbath
-             Vk       = kron(pauli_sigma_z,dzdiag(dmft_bath_%item(ibath)%v(:)))
-             invH_knn = Hbath_build(dmft_bath_%item(ibath)%lambda)
-             invH_k   = nnn2lso_reshape(invH_knn,Nlat,Nns,Norb)
-             invH_k   = zeta(:,:,i) - invH_k
-             call inv(invH_k)
-             invH_k   = matmul(matmul(Vk,invH_k),Vk)
-             invH_knn = lso2nnn_reshape(invH_k,Nlat,Nns,Norb)
-             Fdelta(:,:,:,:,:,:,i)=Fdelta(:,:,:,:,:,:,i) + invH_knn(:,:,1,2,:,:) !get the 12 anomalous component
-          enddo
-       enddo
-    end select
-    !
-  end function fdelta_bath_array
 
-
-
-
-
-
-
-  function g0and_bath(g0and_bath_array(x,dmft_bath_,axis) result(G0and)
-    complex(8),dimension(:),intent(in)                            :: x !complex  array for the frequency
-    type(effective_bath)                                          :: dmft_bath_ !the current :f:var:`effective_bath` instance
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb,size(x)) :: G0and,Delta
-    integer                                                       :: ilat,jlat,iorb,jorb,ispin,jspin,io,jo,Nso,i,L
-    real(8),dimension(size(x))                                    :: det
-    complex(8),dimension(:,:),allocatable                         :: fg,zeta
-    character(len=*),optional                                     :: axis !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis    
-    character(len=4)                                              :: axis_
-    !
-    axis_="mats";if(present(axis))axis_=str(axis)
-    !
-    !
-    L=size(x)
-    !
-    G0and = zero
-    !
-    select case(ed_mode)
-    case default
-       allocate(fg(Nlat*Nspin*Norb,Nlat*Nspin*Norb))
-       G0and = invg0_bath(x,dmft_bath_,axis_)
-       do i=1,L
-          fg=nnn2lso_reshape(G0and(:,:,:,:,:,:,i),Nlat,Nspin,Norb)
-          call inv(fg)
-          G0and(:,:,:,:,:,:,i)=lso2nnn_reshape(fg,Nlat,Nspin,Norb)
-       enddo
-       deallocate(fg)
-       !
-    case ("superc")
-       allocate(fgorb(Nlat*Nns*Norb,Nlat*Nns*Norb),zeta(Nlat*Nns*Norb,Nlat*Nns*Norb))
-       Delta =  delta_bath_array(x,dmft_bath_,axis_)
-       Fdelta= fdelta_bath_array(x,dmft_bath_,axis_)
-
-       do ispin=1,Nspin   !==1
-          do i=1,L
-             Nso = Nlat*Norb
-             zeta = zero
-             fgorb= zero
-             select case(axis_)
-             case default
-                do concurrent(ilat=1:Nlat,iorb=1:Norb)
-                   io = iorb + (ilat-1)*Norb
-                   zeta(io,io)           = x(i) + xmu
-                   zeta(io+Nso,iorb+Nso) = x(i) - xmu
-                enddo
-                do concurrent(ilat=1:Nlat,jlat=1:Nlat,iorb=1:Norb,jorb=1:Norb)
-                   io = iorb + (ilat-1)*Norb
-                   jo = jorb + (jlat-1)*Norb
-                   fgorb(io,jo)         = zeta(io,jo)         - impHloc(ilat,jlat,ispin,ispin,iorb,jorb)        - Delta(ilat,jlat,ispin,ispin,iorb,jorb,i)
-                   fgorb(io,jo+Norb)    = zeta(io,jo+Nso)                                                       - Fdelta(ilat,jlat,ispin,ispin,iorb,jorb,i)
-                   fgorb(io+Nso,jo)     = zeta(io+Nso,jo)                                                       - conjg(Fdelta(ilat,jlat,ispin,ispin,iorb,jorb,i))
-                   fgorb(io+Nso,jo+Nso) = zeta(io+Nso,jo+Nso) + conjg(impHloc(ilat,jlat,ispin,ispin,iorb,jorb)) + conjg( Delta(ilat,jlat,ispin,ispin,iorb,jorb,i) )
-                enddo
-             case("real")
-                do iorb=1,Norb
-                   zeta(iorb,iorb)           =        x(i)     + xmu
-                   zeta(iorb+Norb,iorb+Norb) = -conjg(x(L-i+1) + xmu) !as above this is == -x(i)-mu == -w-i*eta - mu
-                enddo
-                do iorb=1,Norb
-                   do jorb=1,Norb
-                      fgorb(iorb,jorb)           = zeta(iorb,jorb)           - impHloc(ilat,jlat,ispin,ispin,iorb,jorb)         - Delta(ilat,jlat,ispin,ispin,iorb,jorb,i)
-                      fgorb(iorb,jorb+Norb)      = zeta(iorb,jorb+Norb)                                                         - Fdelta(ilat,jlat,ispin,ispin,iorb,jorb,i)
-                      fgorb(iorb+Norb,jorb)      = zeta(iorb+Norb,jorb)                                                         - conjg(Fdelta(ilat,jlat,ispin,ispin,iorb,jorb,i))
-                      fgorb(iorb+Norb,jorb+Norb) = zeta(iorb+Norb,jorb+Norb) + conjg(impHloc(ilat,jlat,ispin,ispin,iorb,jorb))  + conjg( Delta(ilat,jlat,ispin,ispin,iorb,jorb,L-i+1) )
-                   enddo
-                enddo
-             end select
-             !
-             call inv(fgorb)
-             G0and(ispin,ispin,:,:,i) = fgorb(1:Norb,1:Norb)
-             !
-             deallocate(fgorb,zeta)
-          enddo
-       enddo
-    end select
-
-
-
-
-
-    !
-  end function g0and_bath
-
-
-
-
-
-
-
-  function invg0_bath_array(x,dmft_bath_,axis) result(G0and)
-    complex(8),dimension(:),intent(in)                                          :: x !complex  array for the frequency
-    type(effective_bath)                                                        :: dmft_bath_ !the current :f:var:`effective_bath` instance
-    complex(8),dimension(Nlat,Nlat,Nnambu*Nspin,Nnambu*Nspin,Norb,Norb,size(x)) :: G0and,Delta
-    integer                                                                     :: i,ilat,jlat,iorb,jorb,ispin,jspin,io,jo,Nso,L
-    complex(8),dimension(Nlat*Nnambu*Nspin*Norb,Nlat*Nnambu*Nspin*Norb)         :: zeta
-    character(len=*),optional                                                   :: axis !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis    
-    character(len=4)                                                            :: axis_
+  !G0 = (z+mu)1 - Hloc - Delta
+  function invg0_bath_array(x,dmft_bath_,axis) result(invG0and)
+    complex(8),dimension(:),intent(in)                              :: x !complex  array for the frequency
+    type(effective_bath)                                            :: dmft_bath_ !the current :f:var:`effective_bath` instance
+    character(len=*),optional                                       :: axis !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis    
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(x)) :: invG0and,Delta
+    character(len=4)                                                :: axis_    
+    complex(8),dimension(Nnambu*Nspin*Nimp,Nnambu*Nspin*Nimp)       :: iG0
+    complex(8),dimension(Nambu*Nspin*Nimp,size(x))                  :: zeta
     !
     axis_="mats";if(present(axis))axis_=str(axis)
     !
     L = size(x)
+    Ntot = Nambu*Nspin*Nimp
     !
+    !> Get Delta:
     Delta = delta_bath_array(x,dmft_bath_,axis_)
-    G0and = zero
-    do i=1,L
-       zeta = (x(i)+xmu)*zeye(Nlat*Nnambu*Nspin*Norb)
-       G0and(:,:,:,:,:,:,i) = lso2nnn_reshape(zeta,Nlat,Nnambu*Nspin,Norb)-impHloc-Delta(:,:,:,:,:,:,i)
-    enddo
     !
+    select case(bath_type)
+    case default
+       if(Nambu/=1)stop "invG0_bath_array ERROR: Nambu != 1 with ed_mode=normal"
+       do i=1,L
+          invG0and(1,1,:,:,:,:,i) = &
+               so2nn_reshape((x(i)+xmu)*zeye(Nspin*Nimp),Nspin,Nimp) - impHloc - Delta(1,1,:,:,:,:,i)
+       enddo
+    case ("superc")             !treat all the 2x2 Nambu components at once
+       if(Nambu/=2)stop "delta_bath_array ERROR: Nambu != 2 with ed_mode=superc"
+       zeta = zeta_superc(x,mu,axis_)
+       do i=1,L
+          invG0and(:,:,:,:,:,:,i) = nso2nnn_reshape(diag(zeta(:,i))) -  hloc_superc(impHloc) - Delta(:,:,:,:,:,:,i)
+       enddo
+    end select
+    !>ENFORCE SYMMETRY HERE?
+    !D(2,1,:,:,:,:) = conjg(D(1,2,:,:,:,:)) (or dagger?)
+    !D(2,2,:,:,:,:) = -conjg(D(1,1,:,:,:,:/L:1:-1))
   end function invg0_bath_array
 
 
 
 
-  function invf0_bath_array(x,dmft_bath_,axis) result(F0and)
-    complex(8),dimension(:),intent(in)                                          :: x !complex  array for the frequency
-    type(effective_bath)                                                        :: dmft_bath_ !the current :f:var:`effective_bath` instance
-    complex(8),dimension(Nlat,Nlat,Nnambu*Nspin,Nnambu*Nspin,Norb,Norb,size(x)) :: F0and,Fdelta
-    integer                                                                     :: i,ilat,jlat,iorb,jorb,ispin,jspin,io,jo,Nso,L
-    character(len=*),optional                                                   :: axis !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis    
-    character(len=4)                                                            :: axis_
+
+  function g0and_bath_array(x,dmft_bath_,axis) result(G0and)
+    complex(8),dimension(:),intent(in)                              :: x !complex  array for the frequency
+    type(effective_bath)                                            :: dmft_bath_ !the current :f:var:`effective_bath` instance
+    character(len=*),optional                                       :: axis !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis
+    character(len=4)                                                :: axis_    
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(x)) :: G0and
+    complex(8),dimension(Nnambu*Nspin*Nimp,Nnambu*Nspin*Nimp)       :: iG0
     !
     axis_="mats";if(present(axis))axis_=str(axis)
     !
-    L = size(x)
+    L     = size(x)
+    Ntot  = Nambu*Nspin*Nimp
     !
-    Fdelta = fdelta_bath_array(x,dmft_bath_,axis_)
-    F0and  = zero
+    G0and = invg0_bath(x,dmft_bath_,axis_)
+    !
     do i=1,L
-       F0and(:,:,:,:,:,:,i) = -Fdelta(:,:,:,:,:,:,i)
+       iG0=nnn2nso_reshape(G0and(:,:,:,:,:,:,i))
+       call inv(iG0)
+       G0and(:,:,:,:,:,:,i)=nso2nnn_reshape(iG0)
     enddo
-    !
-  end function invf0_bath_array
+    !>ENFORCE SYMMETRY HERE?
+    !D(2,1,:,:,:,:) = conjg(D(1,2,:,:,:,:)) (or dagger?)
+    !D(2,2,:,:,:,:) = -conjg(D(1,1,:,:,:,:/L:1:-1))
+  end function g0and_bath_array
 
 
 
 
 
-  ! Auxiliary ℝ -> ℂ vector-to-diagonal-matrix constructor
-  function dzdiag(x) result(A)
-    real(8),dimension(:)                   :: x
-    complex(8),dimension(:,:),allocatable  :: A
-    integer                                :: N,i
-    N=size(x,1)
-    allocate(A(N,N))
-    A=0.d0
-    do i=1,N
-       A(i,i)=x(i)
+
+
+
+
+
+
+
+
+  function zeta_superc(x,mu,axis) result(zeta)
+    complex(8),dimension(:)                        :: x
+    real(8)                                        :: mu
+    character(len=*)                               :: axis
+    complex(8),dimension(Nambu*Nspin*Nimp,size(x)) :: zeta
+    integer                                        :: N,L
+    N = Nspin*Nimp
+    L = size(x)
+    do concurrent(iorb=1:N)
+       select case(axis_)
+       case default
+          zeta(iorb ,1:L)   = x(1:L) + mu
+          zeta(N+iorb,1:L)  = x(1:L) - mu
+       case ('real')
+          zeta(iorb ,1:L)   = x(1:L) + mu
+          zeta(N+iorb:,1:L) = -conjg(x(L:1:-1) + mu)
+       end select
     enddo
-  end function dzdiag
+  end function zeta_superc
+
+
+  function hloc_superc(h) result(zh)
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp)             :: h
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: zh
+    if(Nambu/=2)stop "hloc_superc ERROR: called with Nambu!=2"
+    zh              = zero 
+    zh(1,1,:,:,:,:) = h
+    zh(2,2,:,:,:,:) = -conjg(h)
+  end function hloc_superc
+
 
 END MODULE ED_BATH_FUNCTIONS

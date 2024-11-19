@@ -14,10 +14,33 @@ MODULE ED_HAMILTONIAN_COMMON
   integer,allocatable,dimension(:)          :: DimUps
   integer,allocatable,dimension(:)          :: DimDws
   !
-  integer                                   :: Hsector=0
-  logical                                   :: Hstatus=.false.
-  type(sector_map),dimension(:),allocatable :: Hs
+  type(sector)                              :: Hsector
+
+
+  integer                                   :: iiup,iidw,jjup,jjdw
+  integer                                   :: iud,jj
+  integer                                   :: ishift
+  integer                                   :: isector,jsector
+  integer                                   :: i,iup,idw
+  integer                                   :: j,jup,jdw
+  integer                                   :: iph,i_el,j_el
+  integer                                   :: m,mup,mdw
+  integer                                   :: ms
+  integer                                   :: impi
+  integer                                   :: iorb,jorb,ispin,jspin,ibath
+  integer                                   :: kp,k1,k2,k3,k4
+  integer                                   :: ialfa,ibeta,indx
+  real(8)                                   :: sg1,sg2,sg3,sg4
+  real(8)                                   :: htmp,htmpup,htmpdw
+  logical                                   :: Jcondition
+  integer                                   :: Nfoo
+  real(8),dimension(:,:,:),allocatable      :: diag_hybr ![Nspin,Nimp,Nbath]
+  real(8),dimension(:,:,:),allocatable      :: bath_diag ![Nspin,Nimp/1,Nbath]
+
+
   integer,save,public                       :: iter=0
+
+
   !
 contains
 
@@ -27,7 +50,17 @@ contains
   !               ALL-2-ALL-V VECTOR MPI TRANSPOSITION 
   !####################################################################
 #ifdef _MPI
-  subroutine vector_transpose_MPI(nrow,qcol,a,ncol,qrow,b)    
+  subroutine vector_transpose_MPI(nrow,qcol,a,ncol,qrow,b)
+    !
+    ! Performs the parallel transposition of the vector :f:var:`a` , as a matrix of dimensions [:f:var:`nrow`, :f:var:`qcol`],
+    ! using MPI :code:`AlltoAllV` procedure, which transfers data such that the j-block, sent from the process i, is
+    ! received by process j and placed as block i. This parallel transposition involves the minimum amount of data transfer
+    ! necessary to execute the matrix-vector product, removing the communicational congestion and unlocking optimal parallel scaling.
+    !
+    ! See `j.cpc.2021.108261`_ for a detailed description of the algorithm implemented in this procedure. 
+    !
+    !.. _j.cpc.2021.108261: https://doi.org/10.1016/j.cpc.2021.108261
+    !
     integer                               :: nrow,ncol,qrow,qcol
     complex(8)                            :: a(nrow,qcol)
     complex(8)                            :: b(ncol,qrow)
