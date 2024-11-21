@@ -2,13 +2,13 @@
      m  = Hsector%H(1)%map(i)
      ib = bdecomp(m,2*Ns)
      !
-     do iorb=1,Norb
+     do iorb=1,Nimp
         nup(iorb)=dble(ib(iorb))
         ndw(iorb)=dble(ib(iorb+Ns))
      enddo
 
      !diagonal, spin conserving:
-     do iorb=1,Norb
+     do iorb=1,Nimp
         do kp=1,Nbath
            ms=getBathStride(iorb,kp)
            !

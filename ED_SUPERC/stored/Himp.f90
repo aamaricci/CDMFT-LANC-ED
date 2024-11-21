@@ -2,14 +2,14 @@
      m  = Hsector%H(1)%map(i)
      ib = bdecomp(m,2*Ns)
      !
-     do iorb=1,Norb
+     do iorb=1,Nimp
         nup(iorb)=dble(ib(iorb))
         ndw(iorb)=dble(ib(iorb+Ns))
      enddo
 
      !> H_Imp: Diagonal Elements, i.e. local part
      htmp = zero
-     do iorb=1,Norb
+     do iorb=1,Nimp
         htmp = htmp + impHloc(1,1,iorb,iorb)*nup(iorb)
         htmp = htmp + impHloc(Nspin,Nspin,iorb,iorb)*ndw(iorb)
         htmp = htmp - xmu*(nup(iorb)+ndw(iorb))
@@ -24,8 +24,8 @@
      !
 
      !Off-diagonal elements, i.e. non-local part
-     do iorb=1,Norb
-        do jorb=1,Norb
+     do iorb=1,Nimp
+        do jorb=1,Nimp
            !this loop considers only the orbital off-diagonal terms
            !because iorb=jorb can not have simultaneously
            !occupation 0 and 1, as required by this if Jcondition:
@@ -69,13 +69,11 @@
            endif
         enddo
      enddo
-     !
-
-
+     
 
      !Evaluate: Fd . D = Fd . (C^+_{a,up}C^+_{a,dw} + C_{a,dw}C_{a,up})
      if(any(pair_field/=0d0))then
-        do iorb=1,Norb
+        do iorb=1,Nimp
            !
            Jcondition = (ib(iorb)==1) .AND. (ib(iorb+Ns)==1)
            if(Jcondition)then
@@ -110,6 +108,7 @@
            endif
         enddo
      endif
-
+     !-------------------------------------------------------
+     
   enddo
 

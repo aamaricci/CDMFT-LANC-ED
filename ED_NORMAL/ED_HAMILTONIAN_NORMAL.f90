@@ -261,5 +261,55 @@ contains
 
 
 
+  subroutine tridiag_Hv_sector_normal(isector,vvinit,alanc,blanc,norm2)
+    !
+    ! Returns the parameters :math:`\vec{\alpha}` and :math:`\vec{\beta}` , respectively :f:var:`alanc` and :f:var:`blanc` , of the partial tridiagonalization of the sector Hamiltonian on a Krylov basis with starting vector :f:var:`vvinit`.
+    !
+    ! Input:
+    !  * :f:var:`isector`
+    !  * :f:var:`vvinit`
+    !
+    ! Output:
+    !  * :f:var:`alanc` corresponding to :math:`\vec{\alpha}`
+    !  * :f:var:`blanc` corresponding to :math:`\vec{\beta}`
+    !  * :f:var:`norm2` the norm of the input vector  :math:`\langle {\rm vvinit}|{\rm vvinit}\rangle` 
+    !
+    integer                            :: isector !current sector index
+    real(8),dimension(:)               :: vvinit  !input vector for the construction of the tridiagonal or Krylov basis
+    real(8),dimension(:),allocatable   :: alanc !:math:`\vec{\alpha}` or diagonal parameters of the tridiagonal basis.
+    real(8),dimension(:),allocatable   :: blanc !:math:`\vec{\beta}` or sub-/over-diagonal parameters of the tridiagonal basis.
+    real(8)                            :: norm2 !norm of the input vector :f:var:`vvinit`
+    !
+    real(8),dimension(:),allocatable   :: vvloc
+    integer                            :: vecDim
+    !
+    !
+    if(MpiMaster)then
+       norm2=dot_product(vvinit,vvinit)
+       vvinit=vvinit/sqrt(norm2)
+    endif
+#ifdef _MPI
+    if(MpiStatus)call bcast_MPI(MpiComm,norm2)
+#endif
+    call build_Hv_sector_normal(isector)
+    allocate(alanc(Hsector%Nlanc),blanc(Hsector%Nlanc))
+    alanc=0d0 ; blanc=0d0
+    if(norm2/=0d0)then
+#ifdef _MPI
+       if(MpiStatus)then
+          vecDim = vecDim_Hv_sector_normal(isector)
+          allocate(vvloc(vecDim))
+          call scatter_vector_MPI(MpiComm,vvinit,vvloc)
+          call sp_lanc_tridiag(MpiComm,spHtimesV_p,vvloc,alanc,blanc)
+       else
+          call sp_lanc_tridiag(spHtimesV_p,vvinit,alanc,blanc)
+       endif
+#else
+       call sp_lanc_tridiag(spHtimesV_p,vvinit,alanc,blanc)
+#endif
+    endif
+    call delete_Hv_sector_normal()
+  end subroutine tridiag_Hv_sector_normal
+
 
 end MODULE ED_HAMILTONIAN_NORMAL

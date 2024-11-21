@@ -57,6 +57,7 @@ module ED_EIGENSPACE
   !
   public :: es_return_sector       !get the sector of a state       !checked
   public :: es_return_energy       !get the energy of a state       !checked
+  public :: es_return_vector       !get the vector of a state       !checked
   public :: es_return_cvector      !get the vector of a state       !checked
   public :: es_return_gs_degeneracy!get the number of degenerate GS !checked
   !
@@ -458,6 +459,9 @@ contains        !some routine to perform simple operation on the lists
 
 
 
+
+
+
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
@@ -570,6 +574,23 @@ contains        !some routine to perform simple operation on the lists
 #endif
 
 
+
+  
+  function es_return_vector(space,n) result(vector)
+    type(sparse_espace),intent(in)      :: space
+    integer,optional,intent(in)         :: n
+    complex(8),dimension(:),allocatable :: vector
+    if(allocated(vector))deallocate(vector)
+#ifdef _MPI    
+    if(MpiStatus)then
+       call es_return_cvector_mpi(MpiComm,space,n,vector)
+    else
+       call es_return_cvector_default(space,n,vector)
+    endif
+#else
+    call es_return_cvector_default(space,n,vector)
+#endif
+  end function es_return_vector
 
 
 

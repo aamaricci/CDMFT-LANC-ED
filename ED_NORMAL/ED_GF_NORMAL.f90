@@ -51,8 +51,8 @@ MODULE ED_GF_NORMAL
 
   !Lanczos shared variables
   !=========================================================
-  complex(8),dimension(:),allocatable   :: state_cvec
-  real(8)                               :: state_e
+  complex(8),dimension(:),allocatable   :: v_state
+  real(8)                               :: e_state
 
 
 
@@ -108,43 +108,22 @@ contains
     !
     if(MpiMaster)call start_timer
     !
-    counter = 0
     do ispin=1,Nspin
        do iorb=1,Nimp
-          !diagonalo 
-          call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,iorb),Nstate=state_list%size) !2= C,Cdg
+          call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,iorb),Nstate=state_list%size) !2= C,Cdg
           call lanc_build_gf_normal_main(iorb,ispin)
           !
-          counter=counter+1
-          if((ED_VERBOSE>1).AND.(MpiMaster))call eta(counter,Nspin*Nimp*Nimp)
-          !
-          !site-off-diagonal:
-          do jn=1,Nambu      !==1
-             do jorb=1,Norb
-                if(iorb==jorb)cycle
-                call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),Nstate=state_list%size)!4=(Cdg_i + Cdg_j)/(CDG_i +iCDG_j)|psi>
-                if(ed_gf_symmetric)then
-                   call lanc_build_gf_normal_mix_chan2(iorb,jorb,ispin)
-                else
-                   call lanc_build_gf_normal_mix_chan4(iorb,jorb,ispin)
-                endif
-                counter=counter+1
-                if((ED_VERBOSE>1).and.(MpiMaster))call eta(counter,Nspin*Nimp*Nimp)
-             enddo
+          do jorb=1,Nimp
+             if(iorb==jorb)cycle
+             call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),Nstate=state_list%size)!4=(Cdg_i + Cdg_j)/(CDG_i +iCDG_j)|psi>
+             if(ed_gf_symmetric)then
+                call lanc_build_gf_normal_mix_chan2(iorb,jorb,ispin)
+             else
+                call lanc_build_gf_normal_mix_chan4(iorb,jorb,ispin)
+             endif
           enddo
        enddo
     enddo
-    !
-    ! !nondiagonal trick
-    ! do iorb=1,Norb
-    !    do jorb=1,Norb
-    !       if(iorb==jorb)cycle
-    !       impGmats(1,1,ispin,ispin,iorb,jorb,:) = 0.5d0*(impGmats(1,1,ispin,ispin,iorb,jorb,:) &
-    !            - (one-chan4*xi)*impGmats(1,1,ispin,ispin,iorb,iorb,:) - (one-chan4*xi)*impGmats(1,1,ispin,ispin,jorb,jorb,:))
-    !       impGreal(1,1,ispin,ispin,iorb,jorb,:) = 0.5d0*(impGreal(1,1,ispin,ispin,iorb,jorb,:) &
-    !            - (one-chan4*xi)*impGreal(isite,isite,ispin,ispin,iorb,iorb,:) - (one-chan4*xi)*impGreal(jsite,jsite,ispin,ispin,jorb,jorb,:))
-    !    enddo
-    ! enddo
     !
     if(MPIMASTER)call stop_timer()
     !
@@ -169,37 +148,24 @@ contains
     integer,intent(in)          :: iorb,ispin
     type(sector)                :: sectorI
     !
-    if(ed_verbose>1)write(LOGfile,*)"Get G_cluster_I"//str(iorb,3)//"_J"//str(iorb,3)
+    if(ed_verbose>1)write(LOGfile,*)"Get G_l"//str(iorb,3)//"_m"//str(iorb,3)//"_s"//str(ispin)
     !
     do istate=1,state_list%size
-       call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,iorb),istate=istate,Nchan=2) !2= C,CDG
+       call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,iorb),istate=istate,Nchan=2) !2= C,CDG
        !
        isector  =  es_return_sector(state_list,istate)
-       state_e  =  es_return_energy(state_list,istate)
-#ifdef _MPI
-       if(MpiStatus)then
-          call es_return_cvector(MpiComm,state_list,istate,state_cvec) 
-       else
-          call es_return_cvector(state_list,istate,state_cvec) 
-       endif
-#else
-       call es_return_cvector(state_list,istate,state_cvec) 
-#endif
+       e_state  =  es_return_energy(state_list,istate)
+       v_state  =  es_return_vector(state_list,istate)
        !
-       if(MpiMaster)then
-          call build_sector(isector,sectorI)
-          if(ed_verbose>2)write(LOGfile,"(A20,I6,20I4)")&
-               'From sector',isector,sectorI%Nups,sectorI%Ndws
-       endif
+       if(MpiMaster)call build_sector(isector,sectorI)
        !
        !ADD ONE PARTICLE:
        jsector = getCDGsector(1,ispin,isector)
        if(jsector/=0)then
-          vvinit =  apply_op_CDG(state_cvec,iorb,ispin,jsector,sectorI)
+          vvinit =  apply_op_CDG(v_state,iorb,ispin,jsector,sectorI)
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(one*norm2,state_e,alfa_,beta_,1,iorb,iorb,ispin,1,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(one*norm2,e_state,alfa_,beta_,1,1,istate,impGmatrix(1,1,ispin,ispin,iorb,iorb))
+          deallocate(alfa_,beta_,vvinit)
        else
           call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,iorb),istate,1,Nexc=0)
        endif
@@ -207,17 +173,16 @@ contains
        !REMOVE ONE PARTICLE:
        jsector = getCsector(1,ispin,isector)
        if(jsector/=0)then
-          vvinit =  apply_op_C(state_cvec,iorb,ispin,jsector,sectorI)
+          vvinit =  apply_op_C(v_state,iorb,ispin,jsector,sectorI)
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(one*norm2,state_e,alfa_,beta_,-1,iorb,iorb,ispin,2,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(one*norm2,e_state,alfa_,beta_,-1,2,istate,impGmatrix(1,1,ispin,ispin,iorb,iorb))
+          deallocate(alfa_,beta_,vvinit)
        else
           call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,iorb),istate,2,Nexc=0)
        endif
        !
        if(MpiMaster)call delete_sector(sectorI)
-       if(allocated(state_cvec))deallocate(state_cvec)
+       if(allocated(v_state))deallocate(v_state)
        !
     enddo
     return
@@ -233,43 +198,29 @@ contains
     integer                     :: iorb,jorb,ispin
     type(sector)                :: sectorI
     !
-    if(ed_verbose > 1)write(LOGfile,*)"Solving G_cluster_I"//str(iorb,3)//"_J"//str(jorb,3)
+    if(ed_verbose>1)write(LOGfile,*)"Get G_l"//str(iorb,3)//"_m"//str(jorb,3)//"_s"//str(ispin)
     !    
     do istate=1,state_list%size
        !
-       call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,Nchan=2) !2= add,del exc. c^+_i|psi> 
-       isector    =  es_return_sector(state_list,istate)
-       state_e    =  es_return_energy(state_list,istate)
-#ifdef _MPI
-       if(MpiStatus)then
-          call es_return_cvector(MpiComm,state_list,istate,state_cvec) 
-       else
-          call es_return_cvector(state_list,istate,state_cvec) 
-       endif
-#else
-       call es_return_cvector(state_list,istate,state_cvec) 
-#endif
+       call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,Nchan=2) !2= add,del exc. c^+_i|psi> 
+       isector  =  es_return_sector(state_list,istate)
+       e_state  =  es_return_energy(state_list,istate)
+       v_state  =  es_return_vector(state_list,istate)
        !
        !
-       if(MpiMaster)then
-          call build_sector(isector,sectorI)
-          if(ed_verbose>=3)write(LOGfile,"(A20,I6,20I4)")&
-               'From sector',isector,sectorI%Nups,sectorI%Ndws
-       endif
-       !
+       if(MpiMaster)call build_sector(isector,sectorI)
        !
        !EVALUATE (c^+_is + c^+_js)|gs> = [1,1].[C_{+1},C_{+1}].[i,j]
        jsector = getCDGsector(1,ispin,isector)
        if(jsector/=0)then
           !
-          vvinit = apply_Cops(state_cvec,[one,one],[1,1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
+          vvinit = apply_Cops(v_state,[one,one],[1,1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
           !
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(one*norm2,state_e,alfa_,beta_,1,iorb,jorb,ispin,1,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(one*norm2,e_state,alfa_,beta_,1,1,istate,impGmatrix(1,1,ispin,ispin,iorb,jorb))
+          deallocate(alfa_,beta_,vvinit)
        else
-          call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=1,Nexc=0)
+          call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=1,Nexc=0)
        endif
        !
        !
@@ -277,18 +228,17 @@ contains
        jsector = getCsector(1,ispin,isector)
        if(jsector/=0)then
           !
-          vvinit =  apply_Cops(state_cvec,[one,one],[-1,-1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
+          vvinit =  apply_Cops(v_state,[one,one],[-1,-1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
           !
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(one*norm2,state_e,alfa_,beta_,-1,iorb,jorb,ispin,2,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(one*norm2,e_state,alfa_,beta_,-1,2,istate,impGmatrix(1,1,ispin,ispin,iorb,jorb))
+          deallocate(alfa_,beta_,vvinit)
        else
-          call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=2,Nexc=0)
+          call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=2,Nexc=0)
        endif
        !
        if(MpiMaster)call delete_sector(sectorI)
-       if(allocated(state_cvec))deallocate(state_cvec)
+       if(allocated(v_state))deallocate(v_state)
        !
     enddo
     return
@@ -303,42 +253,28 @@ contains
     integer                     :: iorb,jorb,ispin
     type(sector)                :: sectorI
     !
-    if(ed_verbose > 1)write(LOGfile,*)"Solving G_cluster_I"//str(iorb,3)//"_J"//str(jorb,3)
+    if(ed_verbose>1)write(LOGfile,*)"Get G_l"//str(iorb,3)//"_m"//str(jorb,3)//"_s"//str(ispin)
     !
     do istate=1,state_list%size
        !
-       call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,Nchan=4)
-       isector    =  es_return_sector(state_list,istate)
-       state_e    =  es_return_energy(state_list,istate)
-#ifdef _MPI
-       if(MpiStatus)then
-          call es_return_cvector(MpiComm,state_list,istate,state_cvec) 
-       else
-          call es_return_cvector(state_list,istate,state_cvec) 
-       endif
-#else
-       call es_return_cvector(state_list,istate,state_cvec) 
-#endif
+       call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,Nchan=4)
+       isector  =  es_return_sector(state_list,istate)
+       e_state  =  es_return_energy(state_list,istate)
+       v_state  =  es_return_vector(state_list,istate)
        !
-       if(MpiMaster)then
-          call build_sector(isector,sectorI)
-          if(ed_verbose>=3)write(LOGfile,"(A20,I6,20I4)")&
-               'From sector',isector,sectorI%Nups,sectorI%Ndws
-       endif
-       !
+       if(MpiMaster)call build_sector(isector,sectorI)
        !
        !EVALUATE (c^+_is + c^+_js)|gs>
        jsector = getCDGsector(1,ispin,isector)
        if(jsector/=0)then
           !
-          vvinit =  apply_Cops(state_cvec,[one,one],[1,1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
+          vvinit =  apply_Cops(v_state,[one,one],[1,1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
           !
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(one*norm2,state_e,alfa_,beta_,1,iorb,jorb,ispin,1,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(one*norm2,e_state,alfa_,beta_,1,1,istate,impGmatrix(1,1,ispin,ispin,iorb,jorb))
+          deallocate(alfa_,beta_,vvinit)
        else
-          call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=1,Nexc=0)
+          call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=1,Nexc=0)
        endif
        !
        !
@@ -346,14 +282,13 @@ contains
        jsector = getCsector(1,ispin,isector)
        if(jsector/=0)then
           !
-          vvinit =  apply_Cops(state_cvec,[one,one],[-1,-1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
+          vvinit =  apply_Cops(v_state,[one,one],[-1,-1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
           !
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(one*norm2,state_e,alfa_,beta_,-1,iorb,jorb,ispin,2,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(one*norm2,e_state,alfa_,beta_,-1,2,istate,impGmatrix(1,1,ispin,ispin,iorb,jorb))
+          deallocate(alfa_,beta_,vvinit)
        else
-          call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=2,Nexc=0)
+          call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=2,Nexc=0)
        endif
        !
        !
@@ -361,14 +296,13 @@ contains
        jsector = getCDGsector(1,ispin,isector)
        if(jsector/=0)then
           !
-          vvinit =  apply_Cops(state_cvec,[one,xi],[1,1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
+          vvinit =  apply_Cops(v_state,[one,xi],[1,1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
           !
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(-xi*norm2,state_e,alfa_,beta_,1,iorb,jorb,ispin,3,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(-xi*norm2,e_state,alfa_,beta_,1,3,istate,impGmatrix(1,1,ispin,ispin,iorb,jorb))
+          deallocate(alfa_,beta_,vvinit)
        else
-          call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=3,Nexc=0)
+          call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=3,Nexc=0)
        endif
        !
        !
@@ -376,18 +310,17 @@ contains
        jsector = getCsector(ialfa,ispin,isector)
        if(jsector/=0)then
           !
-          vvinit =  apply_Cops(state_cvec,[one,-xi],[-1,-1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
+          vvinit =  apply_Cops(v_state,[one,-xi],[-1,-1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
           !
           call tridiag_Hv_sector_normal(jsector,vvinit,alfa_,beta_,norm2)
-          call add_to_lanczos_gf_normal(-xi*norm2,state_e,alfa_,beta_,-1,iorb,jorb,ispin,4,istate)
-          deallocate(alfa_,beta_)
-          if(allocated(vvinit))deallocate(vvinit)
+          call add_to_lanczos_gf_normal(-xi*norm2,e_state,alfa_,beta_,-1,4,istate,impGmatrix(1,1,ispin,ispin,iorb,jorb))
+          deallocate(alfa_,beta_,vvinit)
        else
-          call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=4,Nexc=0)
+          call allocate_GFmatrix(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=4,Nexc=0)
        endif
        !
        if(MpiMaster)call delete_sector(sectorI)
-       if(allocated(state_cvec))deallocate(state_cvec)
+       if(allocated(v_state))deallocate(v_state)
        !
     enddo
     return
@@ -405,21 +338,22 @@ contains
 
 
 
-  subroutine add_to_lanczos_gf_normal(vnorm2,Ei,alanc,blanc,isign,iorb,jorb,ispin,ichan,istate)
-    complex(8)                                 :: vnorm2,pesoBZ,peso
-    real(8)                                    :: Ei,Egs,de
-    integer                                    :: nlanc,itype
-    real(8),dimension(:)                       :: alanc
-    real(8),dimension(size(alanc))             :: blanc 
-    integer                                    :: isign,iorb,jorb,ispin,ichan,istate
-    real(8),dimension(size(alanc),size(alanc)) :: Z
-    real(8),dimension(size(alanc))             :: diag,subdiag
-    integer                                    :: i,j,ierr
-    complex(8)                                 :: iw
+  subroutine add_to_lanczos_gf_normal(vnorm2,Ei,As,Bs,isign,ichan,istate,self)
+    complex(8)                           :: vnorm2,pesoBZ,peso
+    real(8)                              :: Ei,Egs,de
+    integer                              :: nlanc,itype
+    real(8),dimension(:)                 :: As
+    real(8),dimension(size(As))          :: Bs 
+    integer                              :: isign,ichan,istate
+    type(GFmatrix)                       :: self
+    real(8),dimension(size(As),size(As)) :: Z
+    real(8),dimension(size(As))          :: diag,subdiag
+    integer                              :: i,j,ierr
+    complex(8)                           :: iw
     !
     Egs = state_list%emin       !get the gs energy
     !
-    Nlanc = size(alanc)
+    Nlanc = size(As)
     !
     if((finiteT).and.(beta*(Ei-Egs) < 40))then
        pesoBZ = vnorm2*exp(-beta*(Ei-Egs))/zeta_function
@@ -432,28 +366,28 @@ contains
     !
 #ifdef _MPI
     if(MpiStatus)then
-       if(MpiComm /= MPI_COMM_NULL)call Bcast_MPI(MpiComm,alanc)
-       if(MpiComm /= MPI_COMM_NULL)call Bcast_MPI(MpiComm,blanc)
+       if(MpiComm /= MPI_COMM_NULL)call Bcast_MPI(MpiComm,As)
+       if(MpiComm /= MPI_COMM_NULL)call Bcast_MPI(MpiComm,Bs)
     endif
 #endif
     diag             = 0.d0
     subdiag          = 0.d0
     Z                = eye(Nlanc)
-    diag(1:Nlanc)    = alanc(1:Nlanc)
-    subdiag(2:Nlanc) = blanc(2:Nlanc)
+    diag(1:Nlanc)    = As(1:Nlanc)
+    subdiag(2:Nlanc) = Bs(2:Nlanc)
     !
     call eigh(diag(1:Nlanc),subdiag(2:Nlanc),Ev=Z(:Nlanc,:Nlanc))
 
     !
-    call GFmatrix_allocate(impGmatrix(1,1,ispin,ispin,iorb,jorb),istate=istate,ichan=ichan,Nexc=Nlanc)
+    call allocate_GFmatrix(Self,istate=istate,ichan=ichan,Nexc=Nlanc)
     !
     do j=1,nlanc
        de = diag(j)-Ei
        if (de>max_exc)max_exc=de
        peso = pesoBZ*Z(1,j)*Z(1,j)
        !
-       impGmatrix(1,1,ispin,ispin,iorb,jorb)%state(istate)%channel(ichan)%weight(j) = peso
-       impGmatrix(1,1,ispin,ispin,iorb,jorb)%state(istate)%channel(ichan)%poles(j)  = isign*de
+       Self%state(istate)%channel(ichan)%weight(j) = peso
+       Self%state(istate)%channel(ichan)%poles(j)  = isign*de
        !
     enddo
   end subroutine add_to_lanczos_gf_normal

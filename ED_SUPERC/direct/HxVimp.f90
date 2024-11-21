@@ -2,7 +2,7 @@
   htmp = zero
   htmp = htmp - xmu*(sum(nup)+sum(ndw))
   !
-  do iorb=1,Norb
+  do iorb=1,Nimp
      htmp = htmp + impHloc(1,1,iorb,iorb)*nup(iorb)
      htmp = htmp + impHloc(Nspin,Nspin,iorb,iorb)*ndw(iorb)
   enddo
@@ -11,8 +11,8 @@
   !
   !Off-diagonal elements, i.e. non-local part
   !1. same spin:
-  do iorb=1,Norb
-     do jorb=1,Norb
+  do iorb=1,Nimp
+     do jorb=1,Nimp
         !UP
         Jcondition = &
              (impHloc(1,1,iorb,jorb)/=zero) .AND. &
@@ -46,7 +46,7 @@
   !
   !Evaluate: Fd . D = Fd . (C^+_{a,up}C^+_{a,dw} + C_{a,dw}C_{a,up})
   if(any(pair_field/=0d0))then
-     do iorb=1,Norb
+     do iorb=1,Nimp
         !
         Jcondition = (ib(iorb)==1) .AND. (ib(iorb+Ns)==1)
         if(Jcondition)then

@@ -1,32 +1,14 @@
 ! > SPARSE MAT-VEC DIRECT ON-THE-FLY PRODUCT 
-MODULE ED_HAMILTONIAN_DIRECT_HxV
-  USE ED_HAMILTONIAN_COMMON
-  USE ED_AUX_FUNX
+MODULE ED_HAMILTONIAN_SUPERC_DIRECT_HxV
+  USE ED_HAMILTONIAN_SUPERC_COMMON
   implicit none
   private
 
-  integer    :: iiup,iidw
-  integer    :: iud,jj
-  integer    :: i,iup,idw
-  integer    :: j,jup,jdw
-  integer    :: m,mup,mdw
-  integer    :: ishift
-  integer    :: isector,jsector
-  integer    :: ms
-  integer    :: impi
-  integer    :: ilat,jlat,iorb,jorb,ispin,jspin,is,js,ibath
-  integer    :: k1,k2,k3,k4
-  integer    :: ialfa,ibeta
-  real(8)    :: sg1,sg2,sg3,sg4
-  complex(8) :: htmp,htmpup,htmpdw
-  logical    :: Jcondition
-
-
 
   !>Sparse Mat-Vec direct on-the-fly product 
-  public  :: directMatVec_main
+  public  :: directMatVec_superc_main
 #ifdef _MPI
-  public  :: directMatVec_MPI_main
+  public  :: directMatVec_MPI_superc_main
 #endif
 
 
@@ -34,142 +16,168 @@ MODULE ED_HAMILTONIAN_DIRECT_HxV
 contains
 
 
-  subroutine directMatVec_main(Nloc,vin,Hv)
-    integer                                                     :: Nloc
-    complex(8),dimension(Nloc)                                  :: vin
-    complex(8),dimension(Nloc)                                  :: Hv
-    complex(8),dimension(:),allocatable                         :: vt,Hvt
-    integer,dimension(Ns)                                       :: ibup,ibdw
-    integer,dimension(2*Ns_Ud)                                  :: Indices,Jndices ![2-2*Norb]
-    integer,dimension(Ns_Ud,Ns_Orb)                             :: Nups,Ndws       ![1,Ns]-[Norb,1+Nbath]
-    integer,dimension(Nlat,Norb)                                :: Nup,Ndw
-    real(8),dimension(Nlat,Nspin,Norb,Nbath)                    :: diag_hybr
-    real(8),dimension(Nlat,Nspin,Norb,Nbath)                    :: bath_diag
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Nbath) :: Hbath_reconstructed
+  subroutine directMatVec_superc_main(Nloc,vin,Hv)
+    !
+    ! Serial version of the direct, on-the-fly matrix-vector product :math:`\vec{w}=H\times\vec{v}` used in Arpack/Lanczos algorithm.
+    ! This procedures evaluates the non-zero terms of any part of the global Hamiltonian and applies them to the input vector using serial algorithm.  
+    !
+    integer                                                         :: Nloc  !Global dimension of the problem. :code:`size(v)=Nloc=size(Hv)`
+    complex(8),dimension(Nloc)                                      :: vin   !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
+    complex(8),dimension(Nloc)                                      :: Hv    !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
+    integer,dimension(Nlevels)                                    :: ib
+    integer,dimension(Ns)                                         :: ibup,ibdw
+    real(8),dimension(Nimp)                                       :: nup,ndw
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Nbath) :: Hbath_tmp
 
     !
-    if(.not.Hstatus)stop "directMatVec_cc ERROR: Hsector NOT set"
-    isector=Hsector
     !
-    if(Nloc/=getdim(isector))stop "directMatVec_cc ERROR: Nloc != dim(isector)"
+    if(.not.Hsector%status)stop "ed_buildh_main ERROR: Hsector NOT allocated"
+    isector=Hsector%index
+    !
+    Dim   = Hsector%Dim
+    !
+    if(Nloc/=Dim)stop "directMatVec_cc ERROR: Nloc != dim(isector)"
     !
     !Get diagonal hybridization, bath energy
-    diag_hybr=zero
-    bath_diag=zero
+    allocate(diag_hybr(Nspin,Nimp,Nbath));diag_hybr=0d0
+    allocate(bath_diag(Nambu,Nspin,Nimp,Nbath));bath_diag=0d0
     do ibath=1,Nbath
-      Hbath_reconstructed(:,:,:,:,:,:,ibath)=Hbath_build(dmft_bath%item(ibath)%lambda)
-      do ilat=1,Nlat
-        do ispin=1,Nspin
-          do iorb=1,Norb
-            diag_hybr(ilat,ispin,iorb,ibath)=dmft_bath%item(ibath)%v(index_stride_lso(ilat,ispin,iorb))
-            bath_diag(ilat,ispin,iorb,ibath)=DREAL(Hbath_Reconstructed(ilat,ilat,ispin,ispin,iorb,iorb,ibath))
+       Hbath_tmp(:,:,:,:,:,:,ibath)=Hbath_build(dmft_bath%item(ibath)%lambda)
+       do ispin=1,Nspin
+          do iorb=1,Nimp
+             diag_hybr(ispin,iorb,ibath)=dmft_bath%item(ibath)%v(iorb+(ispin-1)*Nimp)
+             do in=1,Nambu
+                bath_diag(in,ispin,iorb,ibath)=dreal(Hbath_tmp(in,in,ispin,ispin,iorb,iorb,ibath))
+             enddo
           enddo
-        enddo
-      enddo
+       enddo
     enddo
     !
     Hv=zero
-    !
-    !-----------------------------------------------!
-    !LOCAL HAMILTONIAN PART: H_loc*vin = vout
-    include "ED_HAMILTONIAN/direct/HxV_local.f90"
-    !
-    !UP HAMILTONIAN TERMS
-    include "ED_HAMILTONIAN/direct/HxV_up.f90"
-    !    
-    !DW HAMILTONIAN TERMS
-    include "ED_HAMILTONIAN/direct/HxV_dw.f90"
-    !
-    !NON-LOCAL HAMILTONIAN PART: H_non_loc*vin = vout
-    if(Jhflag)then
-       include "ED_HAMILTONIAN/direct/HxV_non_local.f90"
-    endif
-    !-----------------------------------------------!
+    states: do i=1,Dim
+       m    = Hsector%H(1)%map(i)
+       ib   = bdecomp(m,2*Ns)
+       !
+       do iorb=1,Nimp
+          nup(iorb)=dble(ib(iorb))
+          ndw(iorb)=dble(ib(iorb+Ns))
+       enddo
+       !
+       !
+       !-----------------------------------------------!
+       !LOCAL HAMILTONIAN TERMS
+       include "direct/HxVimp.f90"
+       !
+       !LOCAL INTERACTION
+       include "direct/HxVint.f90"
+       !
+       !BATH HAMILTONIAN
+       include "direct/HxVbath.f90"
+       !
+       !IMPURITY- BATH HYBRIDIZATION
+       include "direct/HxVimp_bath.f90"
+       !-----------------------------------------------!
+    enddo states
     !
     return
-  end subroutine directMatVec_main
+  end subroutine directMatVec_superc_main
 
 
 #ifdef _MPI
-  subroutine directMatVec_MPI_main(Nloc,vin,Hv)
-    integer                                                     :: Nloc,N
-    complex(8),dimension(Nloc)                                  :: Vin
-    complex(8),dimension(Nloc)                                  :: Hv
-    complex(8),dimension(:),allocatable                         :: vt,Hvt
-    integer,dimension(Ns)                                       :: ibup,ibdw
-    integer,dimension(2*Ns_Ud)                                  :: Indices,Jndices ![2-2*Norb]
-    integer,dimension(Ns_Ud,Ns_Orb)                             :: Nups,Ndws       ![1,Ns]-[Norb,1+Nbath]
-    integer,dimension(Nlat,Norb)                                :: Nup,Ndw
-    real(8),dimension(Nlat,Nspin,Norb,Nbath)                    :: diag_hybr
-    real(8),dimension(Nlat,Nspin,Norb,Nbath)                    :: bath_diag
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Nbath) :: Hbath_reconstructed
-
+  subroutine directMatVec_MPI_superc_main(Nloc,v,Hv)
     !
-    integer                                  :: MpiIerr
-    integer,allocatable,dimension(:)         :: Counts
-    integer,allocatable,dimension(:)         :: Offset
+    ! MPI parallel version of the direct, on-the-fly matrix-vector product :math:`\vec{w}=H\times\vec{v}` used in P-Arpack/P-Lanczos algorithm.
+    ! This procedures evaluates the non-zero terms of any part of the global Hamiltonian and applies them to a part of the vector own by the thread using parallel algorithm.  
     !
-    if(.not.Hstatus)stop "directMatVec_cc ERROR: Hsector NOT set"
-    isector=Hsector
+    integer                                                       :: Nloc !Local dimension of the vector chunk. :code:`size(v)=Nloc` with :math:`\sum_p` :f:var:`Nloc` = :f:var:`Dim`
+    complex(8),dimension(Nloc)                                    :: v    !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
+    complex(8),dimension(Nloc)                                    :: Hv   !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
+    integer                                                       :: N
+    complex(8),dimension(:),allocatable                           :: vin
+    integer,allocatable,dimension(:)                              :: Counts,Offset
+    integer                                                       :: isector
+    integer,dimension(Nlevels)                                    :: ib
+    integer,dimension(Ns)                                         :: ibup,ibdw
+    real(8),dimension(Nimp)                                       :: nup,ndw
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Nbath) :: Hbath_tmp
+    integer                                                       :: first_state,last_state
+    integer                                                       :: first_state_up,last_state_up
+    integer                                                       :: first_state_dw,last_state_dw
+    integer                                                       :: mpiIerr
+    !
+    if(.not.Hsector%status)stop "directMatVec_cc ERROR: Hsector NOT allocated"
+    isector=Hsector%index
+    !
+    Dim   = Hsector%Dim
     !
     !
     if(MpiComm==MPI_UNDEFINED.OR.MpiComm==Mpi_Comm_Null)&
          stop "directMatVec_MPI_cc ERRROR: MpiComm = MPI_UNDEFINED"
     ! if(.not.MpiStatus)stop "directMatVec_MPI_cc ERROR: MpiStatus = F"
     !
-    !Get diagonal hybridization, bath energy
-    diag_hybr=zero
-    bath_diag=zero
+    allocate(diag_hybr(Nspin,Nimp,Nbath));diag_hybr=0d0
+    allocate(bath_diag(Nambu,Nspin,Nimp,Nbath));bath_diag=0d0
     do ibath=1,Nbath
-      Hbath_reconstructed(:,:,:,:,:,:,ibath)=Hbath_build(dmft_bath%item(ibath)%lambda)
-      do ilat=1,Nlat
-        do ispin=1,Nspin
-          do iorb=1,Norb
-            diag_hybr(ilat,ispin,iorb,ibath)=dmft_bath%item(ibath)%v(index_stride_lso(ilat,ispin,iorb))
-            bath_diag(ilat,ispin,iorb,ibath)=Hbath_Reconstructed(ilat,ilat,ispin,ispin,iorb,iorb,ibath)
+       Hbath_tmp(:,:,:,:,:,:,ibath)=Hbath_build(dmft_bath%item(ibath)%lambda)
+       do ispin=1,Nspin
+          do iorb=1,Nimp
+             diag_hybr(ispin,iorb,ibath)=dmft_bath%item(ibath)%v(iorb+(ispin-1)*Nimp)
+             do in=1,Nambu
+                bath_diag(in,ispin,iorb,ibath)=dreal(Hbath_tmp(in,in,ispin,ispin,iorb,iorb,ibath))
+             enddo
           enddo
-        enddo
-      enddo
+       enddo
     enddo
+    !
+
+    N=0
+    call AllReduce_MPI(MpiComm,Nloc,N)
+    !
+    !Reconstruct Vin and get the displacements for AllGatherV call
+    allocate(Counts(0:MpiSize-1)) ; Counts(0:)=0
+    allocate(Offset(0:MpiSize-1)) ; Offset(0:)=0
+    !
+    Counts(0:)        = N/MpiSize
+    Counts(MpiSize-1) = N/MpiSize+mod(N,MpiSize)
+    !
+    do i=1,MpiSize-1
+       Offset(i) = Counts(i-1) + Offset(i-1)
+    enddo
+    !
+    allocate(vin(N)); vin  = zero
+    call MPI_Allgatherv(&
+         v(1:Nloc),Nloc,MPI_Double_Complex,&
+         vin,Counts,Offset,MPI_Double_Complex,&
+         MpiComm,MpiIerr)
     !
     Hv=zero
     !
-    !-----------------------------------------------!
-    !LOCAL HAMILTONIAN PART: H_loc*vin = vout
-    include "ED_HAMILTONIAN/direct_mpi/HxV_local.f90"
-    !
-    !UP HAMILTONIAN TERMS: MEMORY CONTIGUOUS
-    include "ED_HAMILTONIAN/direct_mpi/HxV_up.f90"
-    !
-    !DW HAMILTONIAN TERMS: MEMORY NON-CONTIGUOUS
-    mpiQup=DimUp/MpiSize
-    if(MpiRank<mod(DimUp,MpiSize))MpiQup=MpiQup+1
-    allocate(vt(mpiQup*DimDw)) ;vt=zero
-    allocate(Hvt(mpiQup*DimDw));Hvt=zero
-    call vector_transpose_MPI(DimUp,MpiQdw,Vin,DimDw,MpiQup,vt) !Vin^T --> Vt
-    include "ED_HAMILTONIAN/direct_mpi/HxV_dw.f90"
-    deallocate(vt) ; allocate(vt(DimUp*mpiQdw)) ;vt=zero        !reallocate Vt
-    call vector_transpose_MPI(DimDw,mpiQup,Hvt,DimUp,mpiQdw,vt) !Hvt^T --> Vt
-    Hv = Hv + Vt
-    deallocate(vt)
-    !
-    !NON-LOCAL HAMILTONIAN PART: H_non_loc*vin = vout
-    if(Jhflag)then
-       N = 0
-       call AllReduce_MPI(MpiComm,Nloc,N)
+    states: do i=MpiIstart,MpiIend
+       m  = Hsector%H(1)%map(i)
+       ib = bdecomp(m,2*Ns)
        !
-       allocate(vt(N)) ; vt = zero
-       call allgather_vector_MPI(MpiComm,vin,vt)
+       do iorb=1,Nimp
+          nup(iorb)=dble(ib(iorb))
+          ndw(iorb)=dble(ib(iorb+Ns))
+       enddo
        !
-       include "ED_HAMILTONIAN/direct_mpi/HxV_non_local.f90"
+
+       !IMPURITY  HAMILTONIAN
+       include "direct/HxVimp.f90"
        !
-       deallocate(Vt)
-    endif
-    !-----------------------------------------------!
+       !LOCAL INTERACTION
+       include "direct/HxVint.f90"
+       !
+       !BATH HAMILTONIAN
+       include "direct/HxVbath.f90"
+       !
+       !IMPURITY- BATH HYBRIDIZATION
+       include "direct/HxVimp_bath.f90"
+
+    enddo states
     !
     return
-  end subroutine directMatVec_MPI_main
-
+  end subroutine directMatVec_MPI_superc_main
 #endif
 
 

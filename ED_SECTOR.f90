@@ -303,9 +303,19 @@ contains
        if(allocated(OV))deallocate(OV(sectorJ%Dim))
        allocate(OV(sectorJ%Dim)) ; OV=zero
        !
-       !
-       if(ed_verbose>=3)&
-            write(LOGfile,"(A,I6,2I4)")'apply C',jsector,sectorJ%Nups,sectorJ%Ndws
+       !       
+       if(ed_verbose>2)then
+          select case(ed_mode)
+          case default
+             write(LOGfile,"(2(A,I6,2I4))")&
+                  'From:',isector,sectorI%Nups,sectorI%Ndws,&
+                  ' -> apply C:',jsector,sectorJ%Nups,sectorJ%Ndws
+          case ("superc")
+             write(LOGfile,"(2(A,I6,I3))")&
+                  'From:',isector,sectorI%Sz,&
+                  'apply C:',jsector,sectorJ%Sz
+          end select
+       endif
        !
        do i=1,sectorI%Dim
           !
@@ -365,8 +375,18 @@ contains
        if(allocated(OV))deallocate(OV(sectorJ%Dim))
        allocate(OV(sectorJ%Dim)) ; OV=zero
        !
-       if(ed_verbose>=3)&
-            write(LOGfile,"(A,I6,2I6)")'apply C^+',jsector,sectorJ%Nups,sectorJ%Ndws
+       if(ed_verbose>2)then
+          select case(ed_mode)
+          case default
+             write(LOGfile,"(2(A,I6,2I4))")&
+                  'From:',isector,sectorI%Nups,sectorI%Ndws,&
+                  ' -> apply C^+:',jsector,sectorJ%Nups,sectorJ%Ndws
+          case ("superc")
+             write(LOGfile,"(2(A,I6,I3))")&
+                  'From:',isector,sectorI%Sz,&
+                  'apply C^+:',jsector,sectorJ%Sz
+          end select
+       endif
        !
        do i=1,sectorI%Dim
           !
@@ -433,14 +453,25 @@ contains
        if(allocated(OV))deallocate(OV)
        allocate(OV(sectorJ%Dim)) ; OV=zero
        !
-       if(ed_verbose>=3)write(LOGfile,"(A,I6)")'eval A.Cs:',jsector
-       !
+       if(ed_verbose>2)then
+          select case(ed_mode)
+          case default
+             write(LOGfile,"(2(A,I6,2I4))")&
+                  'From:',isector,sectorI%Nups,sectorI%Ndws,&
+                  ' -> apply C:',jsector,sectorJ%Nups,sectorJ%Ndws
+          case ("superc")
+             write(LOGfile,"(2(A,I6,I3))")&
+                  'From:',isector,sectorI%Sz,&
+                  'apply C:',jsector,sectorJ%Sz
+          end select
+       endif
+
        do is=1,size(As)
           ipos  = Pos(is)
           ispin = Spin(is)
           ios   = Os(is)
-          if(ed_verbose>=3)write(LOGfile,"(A)")
-               'apply '//str(Cstr(ios))//" l:"//str(ipos)//" s:"//str(ispin)
+          if(ed_verbose>2)write(LOGfile,"(A)")
+          'apply '//str(Cstr(ios))//" l:"//str(ipos)//" s:"//str(ispin)
           !
           do i=1,sectorI%Dim
              select case(ed_mode)
