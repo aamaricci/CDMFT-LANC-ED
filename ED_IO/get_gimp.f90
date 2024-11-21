@@ -36,7 +36,7 @@ subroutine ed_get_gimp_site_n2(self,axis,type,z)
   case default; stop "ed_get_gimp ERROR: type is neither Normal, nor Anomalous"
   case ('n','N')
      self = nn2so_reshape(F(1,1,:,:,:,:,:),Nspin,Nimp,Lmats)
-  case('a','A')
+  case ('a','A')
      self = nn2so_reshape(F(1,2,:,:,:,:,:),Nspin,Nimp,Lmats)
   end select
   !
@@ -83,7 +83,7 @@ subroutine ed_get_gimp_site_n4(self,axis,type,z)
   case default; stop "ed_get_gimp ERROR: type is neither Normal, nor Anomalous"
   case ('n','N')
      self = F(1,1,:,:,:,:,:)
-  case('a','A')
+  case ('a','A')
      self = F(1,2,:,:,:,:,:)
   end select
   !

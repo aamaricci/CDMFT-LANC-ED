@@ -5,7 +5,6 @@ MODULE ED_OBSERVABLES
   USE SF_LINALG,  only: inv,eigh,eye
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
-  USE ED_IO                     !< this contains the routine to print GF,Sigma and G0
   USE ED_EIGENSPACE
   USE ED_BATH
   USE ED_SETUP
@@ -62,13 +61,13 @@ contains
     ! 
     ! Calculate the impurity reduced density matrix calling the correct procedure according to the value of :f:var:`ed_mode` .
     !
-    ! * :code:`normal` : :f:func:`local_energy_normal`
-    ! * :code:`superc` : :f:func:`local_energy_superc`
+    ! * :code:`normal` : :f:func:`density_matrix_normal`
+    ! * :code:`superc` : :f:func:`density_matrix_superc`
     !
     write(LOGfile,"(A)")"Get local energy:"
     select case(ed_mode)
     case default  ;call density_matrix_normal()
-    case("superc");call density_matrix_superc()
+       ! case("superc");call density_matrix_superc()
     end select
   end subroutine density_matrix_impurity
 

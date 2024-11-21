@@ -5,16 +5,6 @@ MODULE ED_GREENS_FUNCTIONS
   private
 
 
-  interface get_Gimp
-     module procedure :: get_Gimp_scalar
-     module procedure :: get_Gimp_array
-  end interface get_Gimp
-
-  interface get_Sigma
-     module procedure :: get_Sigma_scalar
-     module procedure :: get_Sigma_array
-  end interface get_Sigma
-
 
 
   public :: buildGf_impurity
@@ -51,45 +41,32 @@ contains
 
 
 
-  function get_Gimp_scalar(zeta) result(Gf)
-    complex(8),intent(in)                                   :: zeta
-    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: Gf
-    select case(ed_mode)
-    case default  ;Gf = get_gimp_normal(zeta)
-    case("superc");Gf = get_gimp_superc(zeta)
-    end select
-  end function get_Gimp_scalar
-
-  function get_Gimp_array(zeta)
+  function get_Gimp(zeta,axis)
     complex(8),dimension(:),intent(in)                                 :: zeta
+    character(len=:),optional                                          :: axis
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Gf
+    character(len=1)                                                   :: axis_
+    axis_ = 'm' ; if(present(axis))axis_ = axis(1:1)
     select case(ed_mode)
-    case default  ;Gf = get_gimp_normal(zeta)
-    case("superc");Gf = get_gimp_superc(zeta)
+    case default  ;Gf = get_gimp_normal(zeta,axis_)
+    case("superc");Gf = get_gimp_superc(zeta,axis_)
     end select
-  end function get_Gimp_array
+  end function get_Gimp
 
 
 
 
-
-  function get_Sigma_scalar(zeta) result(Gf)
-    complex(8),intent(in)                                   :: zeta
-    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: Gf
-    select case(ed_mode)
-    case default  ;Gf = get_Sigma_normal(zeta)
-    case("superc");Gf = get_Sigma_superc(zeta)
-    end select
-  end function get_Sigma_scalar
-
-  function get_Sigma_array(zeta)
+  function get_Sigma(zeta,axis)
     complex(8),dimension(:),intent(in)                                 :: zeta
+    character(len=:),optional                                          :: axis
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Gf
+    character(len=1)                                                   :: axis_
+    axis_ = 'm' ; if(present(axis))axis_ = axis(1:1)
     select case(ed_mode)
-    case default  ;Gf = get_Sigma_normal(zeta)
-    case("superc");Gf = get_Sigma_superc(zeta)
+    case default  ;Gf = get_Sigma_normal(zeta,axis_)
+    case("superc");Gf = get_Sigma_superc(zeta,axis_)
     end select
-  end function get_Sigma_array
+  end function get_Sigma
 
 
 
