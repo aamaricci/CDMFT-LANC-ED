@@ -26,6 +26,7 @@ contains
 
   subroutine ed_checks_global
     !
+    if(Nspin=2)stop "ED WARNING: Nspin=2 code has not been checked thoroughly. Replica bath does not support V_\sigma. Need development"
     if(Lfit>Lmats)Lfit=Lmats
     if(Nspin>2)stop "ED ERROR: Nspin > 2 is currently not supported"
     if(Norb>5)stop "ED ERROR: Norb > 5 is currently not supported"
