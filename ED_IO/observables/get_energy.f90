@@ -1,7 +1,7 @@
-subroutine ed_get_epot_n1(self)
+subroutine ed_get_eimp_n1(self)
   real(8) :: self(4)
   self =  [ed_Epot,ed_Eint,ed_Ehartree,ed_Eknot]
-end subroutine ed_get_epot_n1
+end subroutine ed_get_eimp_n1
 
 subroutine ed_get_epot_n0(self)
   real(8) :: self

@@ -1,15 +1,20 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
 PROJECT(cdmft_ed Fortran)
 SET(VERSION 0.15)
 
-
+MESSAGE(STATUS "OS: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 SET(BUILD_TYPE "RELEASE" CACHE STRING "Build type")
 STRING(TOUPPER "${BUILD_TYPE}" BUILD_TYPE)
 MESSAGE(STATUS "BUILD_TYPE=${BUILD_TYPE}")
 SET(CMAKE_BUILD_TYPE ${BUILD_TYPE} CACHE INTERNAL "Build type" FORCE)
 
+
+# CMakeGraphVizOptions.cmake
+set(GRAPHVIZ_CUSTOM_TARGETS TRUE)
+
+
 # Add our local CMAKE modules to the module path
-SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/Modules")
+SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 INCLUDE(${CMAKE_MODULE_PATH}/ColorsMsg.cmake)
 
 # Check that Fortran 90 is supported
@@ -32,60 +37,16 @@ ENDIF(VERBOSE)
 ############################################################
 # Look for MPI if needed
 ############################################################
-# reSet compiler to MPI is required
-IF(USE_MPI)
-  FIND_PACKAGE(MPI REQUIRED)
-  IF(MPI_Fortran_FOUND)
-    SET(CMAKE_Fortran_COMPILER ${MPI_Fortran_COMPILER})
-    MESSAGE(STATUS "Set Fortran compiler to ${Yellow}${CMAKE_Fortran_COMPILER}${ColourReset}, ID=${CMAKE_Fortran_COMPILER_ID}")
-    SET(MPI_CPP "MPI")		#pre-processing option
-  ELSE()
-    MESSAGE(FATAL_ERROR "MPI Found but No MPI-Fortran compiler can be determined.")    
-  ENDIF()
-ELSE(USE_MPI)
-  SET(MPI_CPP "")
-ENDIF(USE_MPI)
+INCLUDE(${CMAKE_MODULE_PATH}/MpiConfig.cmake)
+
+
 
 
 
 
 ############################################################
-# Check for .git and extract the current SHA1 revision.
-############################################################
-IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
-  FIND_PACKAGE(Git)
-  IF(GIT_FOUND)
-    EXECUTE_PROCESS(
-      COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-      OUTPUT_VARIABLE GIT_SHA1
-      ERROR_QUIET
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    MESSAGE( STATUS "Git version: ${GIT_SHA1}" )
-    EXECUTE_PROCESS(
-      COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
-      WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-      OUTPUT_VARIABLE GIT_BRANCH
-      ERROR_QUIET
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    SET(GIT_BRANCH_ "_${GIT_BRANCH}")
-    MESSAGE( STATUS "Git branch: ${GIT_BRANCH}" )
-    IF( "${GIT_BRANCH}" MATCHES "master")
-      UNSET(GIT_BRANCH)
-      UNSET(GIT_BRANCH_)
-    ENDIF()
-  ELSE(GIT_FOUND)
-    SET(GIT_SHA1 0)
-  ENDIF(GIT_FOUND)
-ENDIF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
-SET(REVISION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/revision.inc)
-FILE(WRITE  ${REVISION_FILE} "character(len=41),parameter,public :: revision = \"${GIT_SHA1}\"\n")
-
-
-
-
-############################################################
-# Look for required libraries: blas,lapack,scifor,dmft_tools
+# Look for required libraries: scifor, dmft_tools
+# (includes Blas/Lapack/Scalapack/Quadpack/Minpack/FFTpack/Arpack/...) 
 ############################################################
 # Find Scifor
 FIND_PACKAGE(PkgConfig)
@@ -96,12 +57,6 @@ ELSE()
   MESSAGE(FATAL_ERROR "
 Can not find SciFortran in this system. Check SciFor installation. Try adding the provided PKG-CONFIG file to the environment:
 $ export PKG_CONFIG_PATH=<path_to_scifor_dir>/etc:$PKG_CONFIG_PATH")
-ENDIF()
-IF("${SCIFOR_LDFLAGS}" MATCHES "mkl")
-  FIND_PACKAGE(MKL QUIET)
-ELSEIF("${SCIFOR_LDFLAGS}" MATCHES "blas" OR "lapack")
-  FIND_PACKAGE(BLAS REQUIRED)
-  FIND_PACKAGE(LAPACK REQUIRED)
 ENDIF()
 INCLUDE_DIRECTORIES(BEFORE ${SCIFOR_INCLUDE_DIRS})
 
@@ -119,100 +74,232 @@ INCLUDE_DIRECTORIES(BEFORE ${DMFT_TOOLS_INCLUDE_DIRS})
 
 
 
+############################################################
+# Configure Fortran Compiler Main options
+############################################################
+INCLUDE(${CMAKE_MODULE_PATH}/FortranCompilerConfig.cmake)
+
+
+
 
 
 ############################################################
-# Set Fortran options based on BUILD_TYPE and FC ID
+# Check for .git and extract the current SHA1 revision.
 ############################################################
-if(CMAKE_Fortran_COMPILER_ID MATCHES GNU) # this is gfortran
-  SET(CMAKE_Fortran_MODDIR_FLAG   "-J")
-  SET(CMAKE_Fortran_FLAGS         "-cpp -ffree-line-length-none ") # -mcmodel=large  this is to remove the 2Gb limit of virtual memory allocation
-  SET(CMAKE_Fortran_FLAGS_TESTING "-O2 -funroll-loops")
-  SET(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -p -g -Wsurprising -Waliasing -fwhole-file -fcheck=all -pedantic -fbacktrace -fbounds-check")
-  SET(CMAKE_Fortran_FLAGS_RELEASE "-O3  -funroll-loops")  ##-fno-protect-parens -flto -ffast-math -march=native
-  
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES Intel)
-  SET(CMAKE_Fortran_MODDIR_FLAG   "-module ") #remember the ending white space here 
-  SET(CMAKE_Fortran_FLAGS         "-fpp")
-  SET(CMAKE_Fortran_FLAGS_TESTING "-O2 -ftz")
-  SET(CMAKE_Fortran_FLAGS_DEBUG   "-p -O0 -g -fpe1 -warn -debug extended -traceback -check all,noarg_temp_created")
-  SET(CMAKE_Fortran_FLAGS_RELEASE "-O3 -ftz")
-
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES G95)
-  SET(CMAKE_Fortran_MODDIR_FLAG   "-fmod=")
-  SET(CMAKE_Fortran_FLAGS         "-cpp")
-  SET(CMAKE_Fortran_FLAGS_TESTING "-O1  -fsloppy-char")
-  SET(CMAKE_Fortran_FLAGS_DEBUG   "-O0 -g -ftrace=full")
-  SET(CMAKE_Fortran_FLAGS_RELEASE "-O3")
-  
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES PGI)
-  SET(CMAKE_Fortran_MODDIR_FLAG   "-module ")
-  SET(CMAKE_Fortran_FLAGS         "-")
-  SET(CMAKE_Fortran_FLAGS         "")
-  SET(CMAKE_Fortran_FLAGS_DEBUG   "-g -O0 -Mframe")
-  SET(CMAKE_Fortran_FLAGS_RELEASE "-O3 -mcmodel=medium -fast -Munroll")
-endif()
-
-
-#set MPI preprocessing defition:
-IF(USE_MPI)
-  ADD_DEFINITIONS(-D_MPI)
-ELSE(USE_MPI)
-  ADD_DEFINITIONS(-D_)
-ENDIF(USE_MPI)
-
-IF( "${BUILD_TYPE}" MATCHES "DEBUG")
-  ADD_DEFINITIONS(-D_DEBUG)
-ENDIF()
-
-
+INCLUDE(${CMAKE_MODULE_PATH}/GitConfig.cmake)
+# IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+#   FIND_PACKAGE(Git)
+#   IF(GIT_FOUND)
+#     EXECUTE_PROCESS(
+#       COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+#       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+#       OUTPUT_VARIABLE GIT_SHA1
+#       ERROR_QUIET
+#       OUTPUT_STRIP_TRAILING_WHITESPACE)
+#     MESSAGE( STATUS "Git version: ${GIT_SHA1}" )
+#     EXECUTE_PROCESS(
+#       COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
+#       WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+#       OUTPUT_VARIABLE GIT_BRANCH
+#       ERROR_QUIET
+#       OUTPUT_STRIP_TRAILING_WHITESPACE)
+#     SET(GIT_BRANCH_ "_${GIT_BRANCH}")
+#     MESSAGE( STATUS "Git branch: ${GIT_BRANCH}" )
+#     IF( "${GIT_BRANCH}" MATCHES "master")
+#       UNSET(GIT_BRANCH)
+#       UNSET(GIT_BRANCH_)
+#     ENDIF()
+#   ELSE(GIT_FOUND)
+#     SET(GIT_SHA1 0)
+#   ENDIF(GIT_FOUND)
+# ENDIF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
+# SET(REVISION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/revision.inc)
+# FILE(WRITE  ${REVISION_FILE} "character(len=41),parameter,public :: revision = \"${GIT_SHA1}\"\n")
 
 
 ############################################################
 # Define the actual files and folders that make up the build
 ############################################################
-SET(USER_HOME $ENV{HOME})
+INCLUDE(${CMAKE_MODULE_PATH}/MainConfig.cmake)
 
+
+
+
+############################################################
+############################################################
+############################################################
 # Define some directories
+SET(LIB_SRC ${CMAKE_SOURCE_DIR})
 SET(DRIVERS ${CMAKE_SOURCE_DIR}/drivers)
+SET(LIB_TMP_INC ${CMAKE_BINARY_DIR}/include)
 
 #define PREFIX
 SET(PREFIX  "$ENV{HOME}/.bin" CACHE PATH "Prefix prepended to install directories")
 SET(CMAKE_INSTALL_PREFIX "${PREFIX}" CACHE INTERNAL "Prefix prepended to install directories" FORCE)
+
+# Have the .mod files placed in the INC folder
+SET(CMAKE_Fortran_MODULE_DIRECTORY ${LIB_TMP_INC})
+INCLUDE_DIRECTORIES(BEFORE ${CMAKE_Fortran_MODULE_DIRECTORY})
 
 # define the executable to compiler
 SET(EXE cdn_hm_2dsquare CACHE STRING "Driver code to compile")
 # SET(CMAKE_INSTALL_EXE "${EXE}" CACHE INTERNAL "Driver code to compile" FORCE)
 
 
-FILE(GLOB CDMFT_ED_LOCAL_SRC
+#INIT:
+CONFIGURE_FILE(${LIB_SRC}/revision.in ${LIB_SRC}/ED_VERSION.f90 @ONLY)
+FILE(GLOB ED_INIT_SRC
+  ED_VERSION.f90
   ED_SPARSE_MATRIX.f90
   ED_SPARSE_MAP.f90
   ED_INPUT_VARS.f90
   ED_VARS_GLOBAL.f90
   ED_AUX_FUNX.f90
+  ED_SECTOR.f90
   ED_SETUP.f90
   ED_EIGENSPACE.f90
-  ED_BATH.f90
-  ED_BATH_FUNCTIONS.f90
-  ED_IO.f90
-  ED_HAMILTONIAN_COMMON.f90
-  ED_HAMILTONIAN_SPARSE_HxV.f90
-  ED_HAMILTONIAN_DIRECT_HxV.f90
+)
+ADD_LIBRARY(ED_INIT_LIB OBJECT  ${ED_INIT_SRC})
+
+
+#BATH
+ADD_SUBDIRECTORY(${LIB_SRC}/ED_BATH)
+ADD_DEPENDENCIES(ED_BATH_LIB
+  ED_INIT_LIB
+)
+
+#NORMAL
+ADD_SUBDIRECTORY(${LIB_SRC}/ED_NORMAL)
+ADD_DEPENDENCIES(ED_NORMAL_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+)
+
+
+# #SUPERC
+# ADD_SUBDIRECTORY(${LIB_SRC}/ED_SUPERC)
+# ADD_DEPENDENCIES(ED_SUPERC_LIB
+#   ED_INIT_LIB
+#   ED_BATH_LIB
+# )
+
+
+#FIT
+ADD_SUBDIRECTORY(${LIB_SRC}/ED_FIT)
+ADD_DEPENDENCIES(ED_FIT_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+  ED_NORMAL_LIB
+  # ED_SUPERC_LIB
+)
+
+
+#HAMILTONIAN WRAPPER
+FILE(GLOB ED_HAMILTONIAN_SRC
   ED_HAMILTONIAN.f90
+)
+ADD_LIBRARY(ED_HAMILTONIAN_LIB OBJECT  ${ED_HAMILTONIAN_SRC})
+ADD_DEPENDENCIES(ED_HAMILTONIAN_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+  ED_NORMAL_LIB
+  # ED_SUPERC_LIB
+)
+
+
+#DIAG WRAPPER
+FILE(GLOB ED_DIAG_SRC
   ED_DIAG.f90
-  ED_GF_SHARED.f90
-  ED_GF_NORMAL.f90
+)
+ADD_LIBRARY(ED_DIAG_LIB OBJECT  ${ED_DIAG_SRC})
+ADD_DEPENDENCIES(ED_DIAG_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+  ED_NORMAL_LIB
+  # ED_SUPERC_LIB
+  ED_HAMILTONIAN_LIB
+)
+
+
+#GF WRAPPER
+FILE(GLOB ED_GF_SRC
   ED_GREENS_FUNCTIONS.f90
+)
+ADD_LIBRARY(ED_GF_LIB OBJECT  ${ED_GF_SRC})
+ADD_DEPENDENCIES(ED_GF_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+  ED_NORMAL_LIB
+  # ED_SUPERC_LIB
+  ED_HAMILTONIAN_LIB
+  ED_DIAG_LIB
+)
+
+
+#OBSERVABLES WRAPPER
+FILE(GLOB ED_OBSERVABLES_SRC
   ED_OBSERVABLES.f90  
-  ED_FIT_REPLICA.f90
-  ED_FIT_GENERAL.f90  
-  ED_FIT_CHI2.f90
+)
+ADD_LIBRARY(ED_OBSERVABLES_LIB OBJECT  ${ED_OBSERVABLES_SRC})
+ADD_DEPENDENCIES(ED_OBSERVABLES_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+  ED_NORMAL_LIB
+  # ED_SUPERC_LIB
+  ED_HAMILTONIAN_LIB
+  ED_DIAG_LIB
+)
+
+
+#IO
+ADD_SUBDIRECTORY(${LIB_SRC}/ED_IO)
+ADD_DEPENDENCIES(ED_IO_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+  ED_GF_LIB
+)
+
+
+
+#FINAL GLOBAL WRAPPER
+FILE(GLOB ED_GLOB_SRC
   ED_MAIN.f90
   CDMFT_ED.f90
-  )
+)
+ADD_LIBRARY(ED_GLOB_LIB OBJECT  ${ED_GLOB_SRC})
 
-SET(CDMFT_ED_OBJS ${CDMFT_ED_LOCAL_SRC})
+
+ADD_DEPENDENCIES(ED_GLOB_LIB
+  ED_INIT_LIB
+  ED_BATH_LIB
+  ED_NORMAL_LIB
+  # ED_SUPERC_LIB
+  ED_HAMILTONIAN_LIB
+  ED_DIAG_LIB
+  ED_GF_LIB
+  ED_OBSERVABLES_LIB
+  ED_IO_LIB
+  ED_FIT_LIB
+)
+
+
+
+SET(CDMFT_ED_OBJS
+  $<TARGET_OBJECTS:ED_INIT_LIB>
+  $<TARGET_OBJECTS:ED_BATH_LIB>
+  $<TARGET_OBJECTS:ED_NORMAL_LIB>
+  # $<TARGET_OBJECTS:ED_SUPERC_LIB>
+  $<TARGET_OBJECTS:ED_HAMILTONIAN_LIB>
+  $<TARGET_OBJECTS:ED_DIAG_LIB>
+  $<TARGET_OBJECTS:ED_GF_LIB>
+  $<TARGET_OBJECTS:ED_OBSERVABLES_LIB>
+  $<TARGET_OBJECTS:ED_IO_LIB>
+  $<TARGET_OBJECTS:ED_FIT_LIB>
+  $<TARGET_OBJECTS:ED_GLOB_LIB>)
+
+
+
+# SET(CDMFT_ED_OBJS ${CDMFT_ED_LOCAL_SRC})
 
 ADD_EXECUTABLE(cdmft_ed ${DRIVERS}/${EXE}.f90 ${CDMFT_ED_OBJS})
 

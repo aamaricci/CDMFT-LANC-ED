@@ -48,6 +48,7 @@ MODULE ED_BATH_DIM
   integer :: is,js
   integer :: io,jo
   integer :: i,j
+  integer :: in,jn
 
 
 contains
@@ -60,7 +61,7 @@ contains
   function get_bath_dimension_symmetries(Nsym) result(bath_size)
     integer :: Nsym !Number of symmetries (for :f:var:`ed_mode` = :code:`replica, general` )
     integer :: bath_size
-    integer :: ndx,isym,Nsym
+    integer :: ndx,isym
     !
     select case(bath_type)
     case("replica","general")
@@ -89,24 +90,18 @@ contains
     !
   end function get_bath_dimension_symmetries
 
+  
 
   function get_bath_dimension_direct_d2(Hloc) result(bath_size)
-    complex(8),optional,intent(in) :: Hloc(:,:) !optional input matrix with dimension [ |Nlso| , |Nlso| ] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
-    integer                        :: bath_size
-    complex(8),dimension(:,:,:,:)  :: H
-    integer                        :: ndx
+    complex(8),intent(in)              :: Hloc(:,:) !optional input matrix with dimension [ |Nlso| , |Nlso| ] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
+    integer                                     :: bath_size
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: H
+    integer                                     :: ndx
     !
     if(ed_mode=='superc')stop "get_bath_dimension_direct_d2 ERROR: called with ed_mode=superc"
+    call assert_shape(Hloc,[Nspin*Nimp,Nspin*Nimp],"get_bath_dimension_direct_d2","Hloc")
     !
-    allocate(H(Nspin,Nspin,Nimp,Nimp))
-    if(present(Hloc))then    !User defined Hloc
-       H = nso2nn_reshape(Hloc,Nspin,Nimp)
-    elseif(Hbath_status)then !User defined Hreplica_basis
-       H = Hbath_build()
-    else                     !Error:
-       deallocate(H)
-       stop "ERROR get_bath_dimension_direct: Neither Hloc present nor Hbath_basisis defined"
-    endif
+    H = so2nn_reshape(Hloc,Nspin,Nimp)
     !
     ndx=0
     do ispin=1,Nspin
@@ -140,22 +135,15 @@ contains
 
 
   function get_bath_dimension_direct_d4(Hloc) result(bath_size)
-    complex(8),optional,intent(in) :: Hloc(:,:,:,:) !optional input matrix with dimension [ |Nspin| , |Nspin| , |Nimp| , |Nimp|] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
-    integer                        :: bath_size
-    complex(8),dimension(:,:,:,:)  :: H
-    integer                        :: ndx,ispin,jspin,iorb,jorb,io,jo
+    complex(8),intent(in)              :: Hloc(:,:,:,:) !optional input matrix with dimension [ |Nspin| , |Nspin| , |Nimp| , |Nimp|] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
+    integer                                     :: bath_size
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: H
+    integer                                     :: ndx
     !
     if(ed_mode=='superc')stop "get_bath_dimension_direct_d2 ERROR: called with ed_mode=superc"
+    call assert_shape(Hloc,[Nspin,Nspin,Nimp,Nimp],"get_bath_dimension_direct_d4","Hloc")
     !
-    allocate(H(Nspin,Nspin,Nimp,Nimp))
-    if(present(Hloc))then    !User defined Hloc
-       H = Hloc
-    elseif(Hbath_status)then !User defined Hreplica_basis
-       H = Hbath_build()
-    else                     !Error:
-       deallocate(H)
-       stop "ERROR get_bath_dimension_direct: Neither Hloc present nor Hbath_basisis defined"
-    endif
+    H = Hloc
     !
     ndx=0
     do ispin=1,Nspin
@@ -189,22 +177,19 @@ contains
 
 
   function get_bath_dimension_direct_d6(Hloc) result(bath_size)
-    complex(8),optional,intent(in) :: Hloc(:,:,:,:,:,:) !optional input matrix with dimension [ |Nlat| , |Nlat| , |Nspin| , |Nspin| , |Norb| , |Norb|] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
-    integer                        :: bath_size
-    complex(8),dimension(:,:,:,:)  :: H
-    integer                        :: ndx,ispin,jspin,iorb,jorb,io,jo
+    complex(8),intent(in)                       :: Hloc(:,:,:,:,:,:) !optional input matrix with dimension [ |Nlat| , |Nlat| , |Nspin| , |Nspin| , |Norb| , |Norb|] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
+    integer                                     :: bath_size
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: H
+    integer                                     :: ndx
     !
     if(ed_mode=='superc')stop "get_bath_dimension_direct_d2 ERROR: called with ed_mode=superc"
+    call assert_shape(Hloc,[Nlat,Nlat,Nspin,Nspin,Nimp,Nimp],"get_bath_dimension_direct_d6","Hloc")
     !
-    allocate(H(Nspin,Nspin,Nimp,Nimp))
-    if(present(Hloc))then    !User defined Hloc
-       H = nnn2nn_reshape(Hloc,Nlat,Nspin,Norb)
-    elseif(Hbath_status)then !User defined Hreplica_basis
-       H = Hbath_build()
-    else                     !Error:
-       deallocate(H)
-       stop "ERROR get_bath_dimension_direct: Neither Hloc present nor Hbath_basisis defined"
-    endif
+    do concurrent(ilat=1:Nlat,jlat=1:Nlat,ispin=1:Nspin,jspin=1:Nspin,iorb=1:Norb,jorb=1:Norb)
+       io = iorb+(ilat-1)*Norb
+       jo = jorb+(jlat-1)*Norb
+       H(ispin,jspin,io,jo) = Hloc(ilat,jlat,ispin,jspin,iorb,jorb)
+    end do
     !
     ndx=0
     do ispin=1,Nspin

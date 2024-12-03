@@ -2,8 +2,8 @@
      iup = iup_index(i,DimUp)
      idw = idw_index(i,DimUp)
      !
-     mup = Hs(1)%map(iup)
-     mdw = Hs(2)%map(idw)
+     mup = Hsector%H(1)%map(iup)
+     mdw = Hsector%H(2)%map(idw)
      !
      Nup = bdecomp(mup,Ns)
      Ndw = bdecomp(mdw,Ns)
@@ -15,12 +15,12 @@
         htmp = htmp + impHloc(Nspin,Nspin,iorb,iorb)*Ndw(iorb)
         htmp = htmp - xmu*( Nup(iorb)+Ndw(iorb) )
      enddo
-     if(any(spin_field(:,3)/=0d0))then
-        !F_z.S^z:= F_z.(n_up-n_dw)
-        do iorb=1,Nimp
-           htmp = htmp + spin_field(iorb,3)*(Nup(iorb)-Ndw(iorb))
-        enddo
-     endif
+     ! if(any(spin_field(:,3)/=0d0))then
+     !    !F_z.S^z:= F_z.(n_up-n_dw)
+     !    do iorb=1,Nimp
+     !       htmp = htmp + spin_field(iorb,3)*(Nup(iorb)-Ndw(iorb))
+     !    enddo
+     ! endif
      !
      !
      !> H_Int: Kanamori interaction part. non-local S-E and P-H terms commented below.

@@ -114,7 +114,7 @@ contains
     do concurrent(ispin=1:Nspin,jspin=1:Nspin,iorb=1:Nimp,jorb=1:Nimp)
        i = iorb + (ispin-1)*Nimp
        j = jorb + (jspin-1)*Nimp
-       M2(i,j) = abs(dreal(M4(inam,jnam,ispin,jspin,iorb,jorb)))
+       M2(i,j) = abs(dreal(M4(ispin,jspin,iorb,jorb)))
     enddo
     !
     do i=1,Nspin*Nimp
@@ -185,7 +185,7 @@ contains
     do concurrent(ispin=1:Nspin,jspin=1:Nspin,iorb=1:Nimp,jorb=1:Nimp)
        i = iorb + (ispin-1)*Nimp
        j = jorb + (jspin-1)*Nimp
-       M2(i,j) = abs(dreal(M4(inam,jnam,ispin,jspin,iorb,jorb)))
+       M2(i,j) = abs(dreal(M4(ispin,jspin,iorb,jorb)))
     enddo
     !
     do i=1,Nspin*Nimp-1
@@ -203,20 +203,23 @@ contains
 
 
   function is_identity_d2(M2) result(flag)
-    real(8),dimension(Nspin*Nimp,Nspin*Nimp) :: M2
-    logical                                  :: flag
+    complex(8),dimension(Nspin*Nimp,Nspin*Nimp) :: M2
+    real(8),dimension(Nspin*Nimp,Nspin*Nimp) :: M2_
+    logical                                     :: flag
     !
     flag=.true.
     !
     if ( ANY( abs(dimag(M2)) .gt. 1d-6 ) ) flag=.false.
     !
+    M2_ = abs(dreal(M2))
     do i=1,Nspin*Nimp-1
-       if((M2(i,i)/=M2(i+1,i+1)).OR.(M2(i,i)<1.d-6))flag=.false.
+       if(  (M2_(i,i)/=M2_(i+1,i+1)) .OR. &
+            (M2_(i,i)<1.d-6) )flag=.false.
     enddo
     !
     do i=1,Nspin*Nimp
        do j=i+1,Nspin*Nimp
-          if(M2(i,j)>1.d-6)flag=.false.
+          if( M2_(i,j)>1.d-6 )flag=.false.
        enddo
     enddo
     !
@@ -230,7 +233,7 @@ contains
 
 
   !A[N,N]
-  function check_herm_d2(A,error)
+  function check_herm_d2(A,error) result(bool)
     complex(8),dimension(:,:) :: A
     real(8),optional          :: error
     logical                   :: bool
@@ -240,7 +243,7 @@ contains
   end function check_herm_d2
 
   !A[Nspin,Nspin,Nimp,Nimp]
-  function check_herm_d4(A,error)
+  function check_herm_d4(A,error) result(bool)
     complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: A
     real(8),optional                            :: error
     complex(8),dimension(Nspin*Nimp,Nspin*Nimp) :: A_
@@ -250,13 +253,13 @@ contains
     do concurrent(ispin=1:Nspin,jspin=1:Nspin,iorb=1:Nimp,jorb=1:Nimp)
        i = iorb + (ispin-1)*Nimp
        j = jorb + (jspin-1)*Nimp
-       A_(i,j) = A(inam,jnam,ispin,jspin,iorb,jorb)
+       A_(i,j) = A(ispin,jspin,iorb,jorb)
     enddo
-    bool = check_herm_d2(A_,error)
+    bool = check_herm_d2(A_,error_)
   end function check_herm_d4
 
   !A[Nambu,Nambu,Nspin,Nspin,Nimp,Nimp]
-  function check_herm_d6(A,error)
+  function check_herm_d6(A,error) result(bool)
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: A
     real(8),optional                                        :: error
     complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp) :: A_
@@ -268,7 +271,7 @@ contains
        j = jorb + (jspin-1)*Nimp + (jnam-1)*Nspin*Nimp
        A_(i,j) = A(inam,jnam,ispin,jspin,iorb,jorb)
     enddo
-    bool = check_herm_d2(A_,error)
+    bool = check_herm_d2(A_,error_)
   end function check_herm_d6
 
 
@@ -286,12 +289,12 @@ contains
     error_ = 1d-6 ; if(present(error))error_=error
     h11    = A(1:N    ,1:N)
     h22    = A(N+1:2*N,N+1:2*N)
-    bool   = check_herm(A,2*N,error_) !this checks also for F = A_12, s.t. A_21=herm(A_12)
+    bool   = check_herm_d2(A,error_) !this checks also for F = A_12, s.t. A_21=herm(A_12)
     bool   = bool.AND.( all(abs(h22 + conjg(h11))<error_) )
   end function check_nambu_d2
 
   !A[Nambu,Nambu,Nspin,Nspin,Nimp,Nimp]
-  function check_nambu_d6(A,error)
+  function check_nambu_d6(A,error) result(bool)
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: A
     real(8),optional                                        :: error
     complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp) :: A_
@@ -303,7 +306,7 @@ contains
        j = jorb + (jspin-1)*Nimp + (jnam-1)*Nspin*Nimp
        A_(i,j) = A(inam,jnam,ispin,jspin,iorb,jorb)
     enddo
-    bool = check_nambu_d2(A_,Nspin*Nimp,error)
+    bool = check_nambu_d2(A_,Nspin*Nimp,error_)
   end function check_nambu_d6
 
 

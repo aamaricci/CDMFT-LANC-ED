@@ -60,7 +60,7 @@ MODULE ED_SECTOR
   public :: apply_op_CDG
   !
   public :: get_Sector
-  public :: get_Indices
+  public :: get_QuantumNumbers
   public :: get_Nup
   public :: get_Ndw
   public :: get_Sz
@@ -80,7 +80,7 @@ MODULE ED_SECTOR
   !
 
 
-
+  
 
 
 contains
@@ -108,7 +108,7 @@ contains
     integer,dimension(Ns_Ud) :: DimUps,DimDws
     integer                  :: DimUp,DimDw,impDIM
     integer                  :: iup,idw
-    integer                  :: nup_,ndw_
+    integer                  :: nup_,ndw_,sz_
     integer                  :: imap,iud
     integer                  :: iIMP,iBATH
     !
@@ -135,9 +135,9 @@ contains
        self%Dim = self%DimUp*self%DimDw
        !
        if(itrace_)then
-          call map_allocate(H,[self%DimUps,self%DimDws],impDim)
+          call map_allocate(self%H,[self%DimUps,self%DimDws],impDim)
        else
-          call map_allocate(H,[self%DimUps,self%DimDws])
+          call map_allocate(self%H,[self%DimUps,self%DimDws])
        endif
        !
        do iud=1,Ns_Ud
@@ -300,7 +300,7 @@ contains
        !
        call build_sector(jsector,sectorJ)
        !
-       if(allocated(OV))deallocate(OV(sectorJ%Dim))
+       if(allocated(OV))deallocate(OV)
        allocate(OV(sectorJ%Dim)) ; OV=zero
        !
        !       
@@ -308,12 +308,12 @@ contains
           select case(ed_mode)
           case default
              write(LOGfile,"(2(A,I6,2I4))")&
-                  'From:',isector,sectorI%Nups,sectorI%Ndws,&
-                  ' -> apply C:',jsector,sectorJ%Nups,sectorJ%Ndws
+                  'From:',sectorI%index,sectorI%Nups,sectorI%Ndws,&
+                  ' -> apply C:',sectorJ%index,sectorJ%Nups,sectorJ%Ndws
           case ("superc")
              write(LOGfile,"(2(A,I6,I3))")&
-                  'From:',isector,sectorI%Sz,&
-                  'apply C:',jsector,sectorJ%Sz
+                  'From:',sectorI%index,sectorI%Sz,&
+                  'apply C:',sectorJ%index,sectorJ%Sz
           end select
        endif
        !
@@ -372,19 +372,19 @@ contains
        !
        call build_sector(jsector,sectorJ)
        !
-       if(allocated(OV))deallocate(OV(sectorJ%Dim))
+       if(allocated(OV))deallocate(OV)
        allocate(OV(sectorJ%Dim)) ; OV=zero
        !
        if(ed_verbose>2)then
           select case(ed_mode)
           case default
              write(LOGfile,"(2(A,I6,2I4))")&
-                  'From:',isector,sectorI%Nups,sectorI%Ndws,&
-                  ' -> apply C^+:',jsector,sectorJ%Nups,sectorJ%Ndws
+                  'From:',sectorI%index,sectorI%Nups,sectorI%Ndws,&
+                  ' -> apply C^+:',sectorJ%index,sectorJ%Nups,sectorJ%Ndws
           case ("superc")
              write(LOGfile,"(2(A,I6,I3))")&
-                  'From:',isector,sectorI%Sz,&
-                  'apply C^+:',jsector,sectorJ%Sz
+                  'From:',sectorI%index,sectorI%Sz,&
+                  'apply C^+:',sectorJ%index,sectorJ%Sz
           end select
        endif
        !
@@ -457,12 +457,12 @@ contains
           select case(ed_mode)
           case default
              write(LOGfile,"(2(A,I6,2I4))")&
-                  'From:',isector,sectorI%Nups,sectorI%Ndws,&
-                  ' -> apply C:',jsector,sectorJ%Nups,sectorJ%Ndws
+                  'From:',sectorI%index,sectorI%Nups,sectorI%Ndws,&
+                  ' -> apply C:',sectorI%index,sectorJ%Nups,sectorJ%Ndws
           case ("superc")
              write(LOGfile,"(2(A,I6,I3))")&
-                  'From:',isector,sectorI%Sz,&
-                  'apply C:',jsector,sectorJ%Sz
+                  'From:',sectorI%index,sectorI%Sz,&
+                  'apply C:',sectorI%index,sectorJ%Sz
           end select
        endif
 
@@ -470,8 +470,8 @@ contains
           ipos  = Pos(is)
           ispin = Spin(is)
           ios   = Os(is)
-          if(ed_verbose>2)write(LOGfile,"(A)")
-          'apply '//str(Cstr(ios))//" l:"//str(ipos)//" s:"//str(ispin)
+          if(ed_verbose>2)write(LOGfile,"(A)")&
+               'apply '//str(Cstr(ios))//" l:"//str(ipos)//" s:"//str(ispin)
           !
           do i=1,sectorI%Dim
              select case(ed_mode)
@@ -609,7 +609,7 @@ contains
     integer,dimension(size(QN)) :: QN_
     !
     Dim = size(QN)
-    if(mod(Dim,2)/=0)stop "get_Indices_main error: Dim%2 != 0"
+    if(mod(Dim,2)/=0)stop "get_QuantumNumbers_normal error: Dim%2 != 0"
     count=isector-1
     do i=1,Dim
        QN_(i) = mod(count,N+1)

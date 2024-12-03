@@ -5,15 +5,15 @@ MODULE ED_HAMILTONIAN_NORMAL_DIRECT_HxV
   implicit none
   private
 
-  
+
   !>Sparse Mat-Vec direct on-the-fly product 
-  public  :: directMatVec_main
+  public  :: directMatVec_normal_main
 #ifdef _MPI
-  public  :: directMatVec_MPI_main
+  public  :: directMatVec_MPI_normal_main
 #endif
 
 
-
+  
 contains
 
 
@@ -23,15 +23,14 @@ contains
     ! This procedures evaluates the non-zero terms of any part of the global Hamiltonian and applies them to the input vector using serial algorithm.  
     !
     integer                                                       :: Nloc !Global dimension of the problem. :code:`size(v)=Nloc=size(Hv)`
-    real(8),dimension(Nloc)                                       :: vin  !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
-    real(8),dimension(Nloc)                                       :: Hv   !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
+    complex(8),dimension(Nloc)                                    :: vin  !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
+    complex(8),dimension(Nloc)                                    :: Hv   !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
     complex(8),dimension(:),allocatable                           :: vt,Hvt
     integer,dimension(Ns)                                         :: ibup,ibdw
     integer,dimension(2*Ns_Ud)                                    :: Indices,Jndices ![2-2*Norb]
     integer,dimension(Ns_Ud,Ns_Orb)                               :: Nups,Ndws       ![1,Ns]-[Norb,1+Nbath]
-    integer,dimension(Nlat,Norb)                                  :: Nup,Ndw
+    integer,dimension(Ns)                                         :: Nup,Ndw
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Norb,Norb,Nbath) :: Hbath_tmp
-
     !
     if(.not.Hsector%status)stop "directMatVec_cc ERROR: Hsector NOT allocated"
     isector=Hsector%index
@@ -46,7 +45,7 @@ contains
     do ibath=1,Nbath
        Hbath_tmp(:,:,:,:,:,:,ibath)=Hbath_build(dmft_bath%item(ibath)%lambda)
        do ispin=1,Nspin
-          do iorb=1,Nip
+          do iorb=1,Nimp
              diag_hybr(ispin,iorb,ibath)=dmft_bath%item(ibath)%v(iorb+(ispin-1)*Nimp)
              bath_diag(ispin,iorb,ibath)=dreal(Hbath_tmp(1,1,ispin,ispin,iorb,iorb,ibath))
           enddo
@@ -76,7 +75,7 @@ contains
   end subroutine directMatVec_normal_main
 
 
-  
+
 
 #ifdef _MPI
   subroutine directMatVec_MPI_normal_main(Nloc,vin,Hv)
@@ -84,18 +83,18 @@ contains
     ! MPI parallel version of the direct, on-the-fly matrix-vector product :math:`\vec{w}=H\times\vec{v}` used in P-Arpack/P-Lanczos algorithm for :f:var:`ed_total_ud` = :code:`True` 
     ! This procedures evaluates the non-zero terms of any part of the global Hamiltonian and applies them to a part of the vector own by the thread using parallel algorithm.  
     !
-    integer                                                     :: Nloc !Local dimension of the vector chunk. :code:`size(v)=Nloc` with :math:`\sum_p` :f:var:`Nloc` = :f:var:`Dim`
-    real(8),dimension(Nloc)                                     :: vin  !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
-    real(8),dimension(Nloc)                                     :: Hv   !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
-    complex(8),dimension(:),allocatable                         :: vt,Hvt
-    integer,dimension(Ns)                                       :: ibup,ibdw
-    integer,dimension(2*Ns_Ud)                                  :: Indices,Jndices ![2-2*Norb]
-    integer,dimension(Ns_Ud,Ns_Orb)                             :: Nups,Ndws       ![1,Ns]-[Norb,1+Nbath]
-    integer,dimension(Nlat,Norb)                                :: Nup,Ndw
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Nbath) :: Hbath_tmp
-    integer                                                     :: MpiIerr
-    integer,allocatable,dimension(:)                            :: Counts
-    integer,allocatable,dimension(:)                            :: Offset
+    integer                                                       :: Nloc !Local dimension of the vector chunk. :code:`size(v)=Nloc` with :math:`\sum_p` :f:var:`Nloc` = :f:var:`Dim`
+    complex(8),dimension(Nloc)                                    :: vin  !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
+    complex(8),dimension(Nloc)                                    :: Hv   !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
+    complex(8),dimension(:),allocatable                           :: vt,Hvt
+    integer,dimension(Ns)                                         :: ibup,ibdw
+    integer,dimension(2*Ns_Ud)                                    :: Indices,Jndices ![2-2*Norb]
+    integer,dimension(Ns_Ud,Ns_Orb)                               :: Nups,Ndws       ![1,Ns]-[Norb,1+Nbath]
+    integer,dimension(Ns)                                         :: Nup,Ndw
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Norb,Norb,Nbath) :: Hbath_tmp
+    integer                                                       :: MpiIerr,N
+    integer,allocatable,dimension(:)                              :: Counts
+    integer,allocatable,dimension(:)                              :: Offset
     !
     if(.not.Hsector%status)stop "directMatVec_cc ERROR: Hsector NOT allocated"
     isector=Hsector%index
@@ -113,7 +112,7 @@ contains
     do ibath=1,Nbath
        Hbath_tmp(:,:,:,:,:,:,ibath)=Hbath_build(dmft_bath%item(ibath)%lambda)
        do ispin=1,Nspin
-          do iorb=1,Nip
+          do iorb=1,Nimp
              diag_hybr(ispin,iorb,ibath)=dmft_bath%item(ibath)%v(iorb+(ispin-1)*Nimp)
              bath_diag(ispin,iorb,ibath)=dreal(Hbath_tmp(1,1,ispin,ispin,iorb,iorb,ibath))
           enddo
@@ -158,7 +157,7 @@ contains
     deallocate(diag_hybr,bath_diag)
     return
   end subroutine directMatVec_MPI_normal_main
-
+  
 #endif
 
 

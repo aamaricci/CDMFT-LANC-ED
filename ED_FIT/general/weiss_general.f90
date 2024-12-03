@@ -1,3 +1,6 @@
+!######################################################################
+! WEISS : NORMAL
+!######################################################################
 function g0and_general_normal(a) result(G0and)
   real(8),dimension(:)                               :: a
   complex(8),dimension(Nspin,Nspin,Nimp,Nimp,Ldelta) :: G0and,Delta
@@ -18,6 +21,64 @@ end function g0and_general_normal
 
 
 
+
+!######################################################################
+! WEISS : SUPERC
+!######################################################################
+function g0and_general_superc(a) result(G0and)
+  real(8),dimension(:)                                           :: a
+  complex(8),dimension(2,Nspin,Nspin,Nimp,Nimp,Ldelta)           :: G0and
+  complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)        :: FG,Haux,Htmp,Z,Zloc,Vaux
+  complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp)        :: g0
+  complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Ldelta) :: delta
+  integer                                                        :: i,stride
+  real(8),dimension(Nbath,Nspin*Nimp)                            :: Vk
+  real(8),dimension(Nbath,Nlambdas)                              :: Lk
+  !!Get Hs
+  stride = 0
+  do ibath=1,Nbath
+     !Get Vs
+     Vk(ibath,:)= a(stride+1:stride+Nspin*Nimp)
+     stride     = stride + Nspin*Norb
+     !Get Lambdas
+     Lk(ibath,:)= a(stride+1:stride+Nlambdas)
+     stride     = stride + Nlambdas
+  enddo
+  !
+  !> get all Delta components:
+  Delta=zero
+  do ibath=1,Nbath
+     Vaux = kron(pauli_sigma_z,one*diag(Vk(ibath,:)))
+     Htmp = nnn2nso_reshape(Hbath_build(Lk(ibath,:)))
+     do i=1,Ldelta
+        Z  = xi*Xdelta(i)*zeye(Nambu*Nspin*Nimp)
+        Haux = Z - Htmp
+        call inv(Haux)
+        Delta(:,:,:,:,:,:,i)=Delta(:,:,:,:,:,:,i) + nso2nnn_reshape( matmul(matmul(Vaux,Haux),Vaux) )
+     enddo
+  enddo
+  !
+  Zloc = xmu*kron(pauli_tau_z,zeye(Nspin*Nimp)) - &
+       kron(pauli_tau_z,nn2so_reshape(impHloc,Nspin,Nimp))
+  do i=1,Ldelta
+     Z    = xi*Xdelta(i)*zeye(Nambu*Nspin*Nimp) + Zloc
+     FG = Z - nnn2nso_reshape(Delta(:,:,:,:,:,:,i))
+     call inv(FG)
+     g0 = nso2nnn_reshape(FG)
+     G0and(1,:,:,:,:,i) = g0(1,1,:,:,:,:)
+     G0and(2,:,:,:,:,i) = g0(1,2,:,:,:,:)
+  enddo
+  !
+end function g0and_general_superc
+
+
+
+
+
+
+!######################################################################
+! WEISS GRAD : NORMAL
+!######################################################################
 function grad_g0and_general_normal(a) result(dG0and)
   real(8),dimension(:)                                       :: a
   complex(8),dimension(Nspin,Nspin,Nimp,Nimp,Ldelta,size(a)) :: dG0and,dDelta
@@ -47,48 +108,6 @@ end function grad_g0and_general_normal
 
 
 
-!##################################################################
-!##################################################################
-!##################################################################
-
-
-
-function g0and_general_superc(a) result(G0and)
-  real(8),dimension(:)                                    :: a
-  complex(8),dimension(2,Nspin,Nspin,Nimp,Nimp,Ldelta)    :: G0and
-  complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp) :: fgorb,Haux,Z,Zloc,Vaux,Delta
-  complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: g0
-  integer                                                 :: i,stride
-  real(8),dimension(Nbath,Nspin*Nimp)                     :: Vk
-  real(8),dimension(Nbath,Nlambdas)                       :: Lk
-  !!Get Hs
-  stride = 0
-  do ibath=1,Nbath
-     !Get Vs
-     Vk(ibath,:)= a(stride+1:stride+Nspin*Nimp)
-     stride     = stride + Nspin*Norb
-     !Get Lambdas
-     Lk(ibath,:)= a(stride+1:stride+Nlambdas)
-     stride     = stride + Nlambdas
-  enddo
-  !
-  Zloc = xmu*kron(pauli_tau_z_,zeye(Nspin*Nimp)) - &
-       kron(pauli_tau_z,nn2so_reshape(impHloc,Nspin,Nimp))
-  do i=1,Ldelta
-     Z    = xi*Xdelta(i)*zeye(Nambu*Nspin*Nimp)
-     Delta= zero  
-     do ibath=1,Nbath
-        Vaux = kron(pauli_sigma_z,one*diag(Vk(ibath,:)))
-        Haux = Z - nnn2nso_reshape(Hbath_build(Lk(ibath,:)))
-        call inv(Haux)
-        Delta = Delta + matmul(matmul(Vaux,Haux),Vaux)
-     enddo
-     !
-     FGorb = Z + Zloc - Delta
-     call inv(FGorb)
-     g0 = nso2nnn_reshape(FGorb)
-     G0and(1,:,:,:,:,i) = Deltai(1,1,:,:,:,:)
-     G0and(2,:,:,:,:,i) = Deltai(1,2,:,:,:,:)
-  enddo
-  !
-end function g0and_general_superc
+!######################################################################
+! WEISS GRAD : SUPERC ??
+!######################################################################

@@ -59,11 +59,6 @@ contains
     integer                            :: i,iup,idw
     integer                            :: j,jup,jdw
     !
-    Hsector=isector
-    Hstatus=.true.
-    !
-    allocate(Hs(2*Ns_Ud))
-
     call build_sector(isector,Hsector)
     !
     allocate(DimUps(Ns_Ud))
@@ -169,7 +164,7 @@ contains
 
 
 
-  subroutine delete_Hv_sector()
+  subroutine delete_Hv_sector_normal()
     !
     ! Delete the all the memory used to construct the sector Hamiltonian and the corresponding matrix vector products.
     ! The sector is deleted, all the dimensions and MPI splitting variables are reset to zero. All the sparse matrices are deallocated having gone out of scope. The abstract interface pointer :f:var:`spHtimesV_p` for the matrix-vector product is nullified. 
@@ -223,7 +218,7 @@ contains
 #endif
     iter=0
     !
-  end subroutine delete_Hv_sector
+  end subroutine delete_Hv_sector_normal
 
 
 
@@ -274,14 +269,14 @@ contains
     !  * :f:var:`blanc` corresponding to :math:`\vec{\beta}`
     !  * :f:var:`norm2` the norm of the input vector  :math:`\langle {\rm vvinit}|{\rm vvinit}\rangle` 
     !
-    integer                            :: isector !current sector index
-    real(8),dimension(:)               :: vvinit  !input vector for the construction of the tridiagonal or Krylov basis
-    real(8),dimension(:),allocatable   :: alanc !:math:`\vec{\alpha}` or diagonal parameters of the tridiagonal basis.
-    real(8),dimension(:),allocatable   :: blanc !:math:`\vec{\beta}` or sub-/over-diagonal parameters of the tridiagonal basis.
-    real(8)                            :: norm2 !norm of the input vector :f:var:`vvinit`
+    integer                             :: isector !current sector index
+    complex(8),dimension(:)             :: vvinit  !input vector for the construction of the tridiagonal or Krylov basis
+    real(8),dimension(:),allocatable    :: alanc !:math:`\vec{\alpha}` or diagonal parameters of the tridiagonal basis.
+    real(8),dimension(:),allocatable    :: blanc !:math:`\vec{\beta}` or sub-/over-diagonal parameters of the tridiagonal basis.
+    real(8)                             :: norm2 !norm of the input vector :f:var:`vvinit`
     !
-    real(8),dimension(:),allocatable   :: vvloc
-    integer                            :: vecDim
+    complex(8),dimension(:),allocatable :: vvloc
+    integer                             :: vecDim
     !
     !
     if(MpiMaster)then

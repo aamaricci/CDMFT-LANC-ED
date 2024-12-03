@@ -35,7 +35,7 @@ subroutine ed_get_reduced_density_matrix_single(rdm,orbital_mask,doprint)
   integer,dimension(:),allocatable                    :: red_indices
   integer,dimension(:),allocatable                    :: trace_indices
   integer,dimension(:),allocatable                    :: IbUP,IbDW
-  integer                                             :: JbUP,JbDW
+  integer,dimension(:),allocatable                    :: JbUP,JbDW
   integer                                             :: iUP,iDW
   integer                                             :: jUP,jDW
   integer                                             :: iIMPup,iIMPdw

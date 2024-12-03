@@ -97,12 +97,14 @@ MODULE ED_AUX_FUNX
   public :: binary_search
   public :: sequential_search
   !AUX RESHAPE FUNCTIONS (internal use)
-  public :: imp_state_index  
-  public :: index_stride_lso  
-  public :: lso2nnn_reshape
+  ! public :: imp_state_index  
+  ! public :: index_stride_lso  
+  ! public :: lso2nnn_reshape
+  ! public :: nnn2lso_reshape
   public :: so2nn_reshape
-  public :: nnn2lso_reshape
   public :: nn2so_reshape
+  public :: nso2nnn_reshape
+  public :: nnn2nso_reshape
   !SEARCH CHEMICAL POTENTIAL, this should go into DMFT_TOOLS I GUESS
   public :: ed_search_variable
   public :: search_chemical_potential
@@ -115,9 +117,6 @@ MODULE ED_AUX_FUNX
   public :: ed_set_suffix
   public :: ed_reset_suffix
   !
-  public :: save_gfprime
-  public :: read_gfprime
-
 
   !MPI PROCEDURES
 #ifdef _MPI
@@ -160,6 +159,7 @@ MODULE ED_AUX_FUNX
   integer :: is,js
   integer :: io,jo
   integer :: i,j
+  integer :: in,jn
 
 contains
 
@@ -230,7 +230,12 @@ contains
     if(allocated(impHloc))deallocate(impHloc)
     allocate(impHloc(Nspin,Nspin,Nimp,Nimp));impHloc=zero
     !
-    impHloc = nnn2nn_reshape(Hloc,Nlat,Nspin,Norb) !H4 <-- H6
+    do concurrent(ilat=1:Nlat,jlat=1:Nlat,ispin=1:Nspin,jspin=1:Nspin,iorb=1:Norb,jorb=1:Norb)
+       is = iorb + (ilat-1)*Norb
+       js = jorb + (jlat-1)*Norb
+       impHloc(ispin,jspin,is,js) = Hloc(ilat,jlat,ispin,jspin,iorb,jorb)
+    enddo
+
     !
     if(ed_verbose>2)call print_hloc(impHloc)
     !
@@ -472,7 +477,7 @@ contains
     allocate(Offset(0:MpiSize-1)) ; Offset=0
     !
     !Get Counts;
-    call MPI_AllGather(Nloc/DimPh,1,MPI_INTEGER,Counts,1,MPI_INTEGER,MpiComm,MpiIerr)
+    call MPI_AllGather(Nloc,1,MPI_INTEGER,Counts,1,MPI_INTEGER,MpiComm,MpiIerr)
     !
     !Get Offset:
     Offset(0)=0
@@ -481,19 +486,17 @@ contains
     enddo
     !
     Vloc=0d0
-    do iph=1,Dimph
-       if(MpiMaster)then
-          v_start = 1 + (iph-1)*(N/Dimph)
-          v_end = iph*(N/Dimph)
-       else
-          v_start = 1
-          v_end = 1
-       endif
-       vloc_start = 1 + (iph-1)*(Nloc/Dimph)
-       vloc_end = iph*(Nloc/Dimph)
-       call MPI_Scatterv(V(v_start:v_end),Counts,Offset,MPI_DOUBLE_PRECISION,&
-            Vloc(vloc_start:vloc_end),Nloc/DimPh,MPI_DOUBLE_PRECISION,0,MpiComm,MpiIerr)
-    enddo
+    if(MpiMaster)then
+       v_start = 1
+       v_end = N
+    else
+       v_start = 1
+       v_end = 1
+    endif
+    vloc_start = 1 
+    vloc_end = Nloc
+    call MPI_Scatterv(V(v_start:v_end),Counts,Offset,MPI_DOUBLE_PRECISION,&
+         Vloc(vloc_start:vloc_end),Nloc,MPI_DOUBLE_PRECISION,0,MpiComm,MpiIerr)
     !
     return
   end subroutine d_scatter_vector_MPI
@@ -616,7 +619,7 @@ contains
     allocate(Offset(0:MpiSize-1)) ; Offset=0
     !
     !Get Counts;
-    call MPI_AllGather(Nloc/Dimph,1,MPI_INTEGER,Counts,1,MPI_INTEGER,MpiComm,MpiIerr)
+    call MPI_AllGather(Nloc,1,MPI_INTEGER,Counts,1,MPI_INTEGER,MpiComm,MpiIerr)
     !
     !Get Offset:
     Offset(0)=0
@@ -624,20 +627,18 @@ contains
        Offset(i) = Offset(i-1) + Counts(i-1)
     enddo
     !
-    do iph=1,Dimph
-       if(MpiMaster)then
-          v_start = 1 + (iph-1)*(N/Dimph)
-          v_end = iph*(N/Dimph)
-       else
-          v_start = 1
-          v_end = 1
-       endif
-       vloc_start = 1 + (iph-1)*(Nloc/Dimph)
-       vloc_end = iph*(Nloc/Dimph)
-       !
-       call MPI_Gatherv(Vloc(vloc_start:vloc_end),Nloc/DimPh,MPI_DOUBLE_PRECISION,&
-            V(v_start:v_end),Counts,Offset,MPI_DOUBLE_PRECISION,0,MpiComm,MpiIerr)
-    enddo
+    if(MpiMaster)then
+       v_start = 1 
+       v_end = N
+    else
+       v_start = 1
+       v_end = 1
+    endif
+    vloc_start = 1 
+    vloc_end = Nloc
+    !
+    call MPI_Gatherv(Vloc(vloc_start:vloc_end),Nloc,MPI_DOUBLE_PRECISION,&
+         V(v_start:v_end),Counts,Offset,MPI_DOUBLE_PRECISION,0,MpiComm,MpiIerr)
     !
     return
   end subroutine d_gather_vector_MPI
@@ -714,7 +715,7 @@ contains
     allocate(Offset(0:MpiSize-1)) ; Offset=0
     !
     !Get Counts;
-    call MPI_AllGather(Nloc/Dimph,1,MPI_INTEGER,Counts,1,MPI_INTEGER,MpiComm,MpiIerr)
+    call MPI_AllGather(Nloc,1,MPI_INTEGER,Counts,1,MPI_INTEGER,MpiComm,MpiIerr)
     !
     !Get Offset:
     Offset(0)=0
@@ -723,14 +724,12 @@ contains
     enddo
     !
     V = 0d0
-    do iph=1,Dimph
-       v_start = 1 + (iph-1)*(N/Dimph)
-       v_end = iph*(N/Dimph)
-       vloc_start = 1 + (iph-1)*(Nloc/Dimph)
-       vloc_end = iph*(Nloc/Dimph)
-       call MPI_AllGatherv(Vloc(vloc_start:vloc_end),Nloc/DimPh,MPI_DOUBLE_PRECISION,&
-            V(v_start:v_end),Counts,Offset,MPI_DOUBLE_PRECISION,MpiComm,MpiIerr)
-    enddo
+    v_start = 1
+    v_end = N
+    vloc_start = 1 
+    vloc_end = Nloc
+    call MPI_AllGatherv(Vloc(vloc_start:vloc_end),Nloc,MPI_DOUBLE_PRECISION,&
+         V(v_start:v_end),Counts,Offset,MPI_DOUBLE_PRECISION,MpiComm,MpiIerr)
     !
     return
   end subroutine d_allgather_vector_MPI
@@ -1559,12 +1558,10 @@ contains
 
 
 
-
   !##################################################################
   !##################################################################
   !##################################################################
   !##################################################################
-
 
 
 

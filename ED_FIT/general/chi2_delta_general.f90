@@ -1,4 +1,6 @@
-!NORMAL
+!######################################################################
+! DELTA CHI2 FIT : NORMAL
+!######################################################################
 function chi2_delta_general_normal(a) result(chi2)
   !Evaluate the \chi^2 distance of \Delta_Anderson function.
   real(8),dimension(:) :: a
@@ -11,44 +13,6 @@ function chi2_delta_general_normal(a) result(chi2)
   end select
 end function chi2_delta_general_normal
 
-function grad_chi2_delta_general_normal(a) result(dchi2)
-  !Evaluate the gradient \Grad\chi^2 of \Delta_Anderson function.
-  real(8),dimension(:)       :: a
-  real(8),dimension(size(a)) :: dchi2
-  !
-  select case(cg_norm)
-  case default;stop "chi2_fitgf_general_normal error: cg_norm != [elemental,frobenius]"
-  case ("elemental");dchi2 = grad_chi2_delta_general_normal_elemental(a)
-  case ("frobenius");dchi2 = grad_chi2_delta_general_normal_frobenius(a)
-  end select
-  !
-end function grad_chi2_delta_general_normal
-
-
-
-!SUPERC
-function chi2_delta_general_superc(a) result(chi2)
-  !Evaluate the \chi^2 distance of \Delta_Anderson function.
-  real(8),dimension(:) :: a
-  real(8)              :: chi2
-  !
-  select case(cg_norm)
-  case default;stop "chi2_fitgf_general_normal error: cg_norm != [elemental,frobenius]"
-  case ("elemental");chi2 = chi2_delta_general_superc_elemental(a)
-  case ("frobenius");chi2 = chi2_delta_general_superc_frobenius(a)
-  end select
-end function chi2_delta_general_superc
-
-
-
-
-
-!+-----------------------------------------------------------------+
-!+-----------------------------------------------------------------+
-!+-----------------------------------------------------------------+
-
-
-!NORMAL
 !> ELEMENTAL NORM: weighted sum over i\omega for each matrix element, then weighted sum over elements
 function chi2_delta_general_normal_elemental(a) result(chi2)
   real(8),dimension(:)                               :: a
@@ -76,7 +40,51 @@ function chi2_delta_general_normal_elemental(a) result(chi2)
   !
 end function chi2_delta_general_normal_elemental
 
-!SUPERC
+!> FROBENIUS NORM: global \chi^2 for all components, only i\omega are weighted
+function chi2_delta_general_normal_frobenius(a) result(chi2)
+  real(8),dimension(:)                                           :: a
+  real(8)                                                        :: chi2
+  real(8),dimension(Ldelta)                                      :: chi2_freq
+  complex(8),dimension(Nspin,Nspin,Nimp,Nimp,Ldelta)             :: Delta
+  complex(8),dimension(Nspin*Nimp,Nspin*Nimp)                    :: Delta_lso
+  integer                                                        :: l
+  !
+  Delta = delta_general_normal(a)
+  !
+  do l=1,Ldelta
+     Delta_lso    =  nn2so_reshape(delta(:,:,:,:,l) - FGmatrix(:,:,:,:,l),Nspin,Nimp)
+     chi2_freq(l) =  sqrt(trace(matmul(Delta_lso,conjg(transpose(Delta_lso)))))
+  enddo
+  !
+  chi2 = sum(chi2_freq**cg_pow/Wdelta) !Weighted sum over matsubara frqs
+  chi2 = chi2/Ldelta/(Nspin*Nimp)      !Normalization over {iw} and Nlso
+  !
+end function chi2_delta_general_normal_frobenius
+
+
+
+
+
+
+
+
+
+
+!######################################################################
+! DELTA CHI2 FIT : SUPERC
+!######################################################################
+function chi2_delta_general_superc(a) result(chi2)
+  !Evaluate the \chi^2 distance of \Delta_Anderson function.
+  real(8),dimension(:) :: a
+  real(8)              :: chi2
+  !
+  select case(cg_norm)
+  case default;stop "chi2_fitgf_general_normal error: cg_norm != [elemental,frobenius]"
+  case ("elemental");chi2 = chi2_delta_general_superc_elemental(a)
+  case ("frobenius");chi2 = chi2_delta_general_superc_frobenius(a)
+  end select
+end function chi2_delta_general_superc
+
 function chi2_delta_general_superc_elemental(a) result(chi2)
   real(8),dimension(:)                                 :: a
   real(8)                                              :: chi2
@@ -105,8 +113,55 @@ function chi2_delta_general_superc_elemental(a) result(chi2)
 end function chi2_delta_general_superc_elemental
 
 
+function chi2_delta_general_superc_frobenius(a) result(chi2)
+  real(8),dimension(:)                                 :: a
+  real(8)                                              :: chi2
+  real(8),dimension(Ldelta)                            :: chi2_freq
+  complex(8),dimension(2,Nspin,Nspin,Nimp,Nimp,Ldelta) :: Delta
+  complex(8),dimension(Nspin*Nimp,Nspin*Nimp)          :: D,F
+  integer                                              :: l
+  !
+  Delta = delta_general_superc(a)
+  !
+  do l=1,Ldelta
+     D    =  nn2so_reshape(delta(1,:,:,:,:,l) - FGmatrix(:,:,:,:,l),Nspin,Nimp)
+     F    =  nn2so_reshape(delta(2,:,:,:,:,l) - FFmatrix(:,:,:,:,l),Nspin,Nimp)          
+     chi2_freq(l) =  &
+          sqrt(trace(matmul(D,conjg(transpose(D)))))  + &
+          sqrt(trace(matmul(F,conjg(transpose(F)))))
+  enddo
+  !
+  chi2 = sum(chi2_freq**cg_pow/Wdelta) !Weighted sum over matsubara frqs
+  chi2 = chi2/Ldelta/(Nspin*Nimp)      !Normalization over {iw} and Nlso
+  !
+end function chi2_delta_general_superc_frobenius
 
-!NORMAL
+
+
+
+
+
+
+
+
+
+
+!######################################################################
+! DELTA GRAD chi2: NORMAL
+!######################################################################
+function grad_chi2_delta_general_normal(a) result(dchi2)
+  !Evaluate the gradient \Grad\chi^2 of \Delta_Anderson function.
+  real(8),dimension(:)       :: a
+  real(8),dimension(size(a)) :: dchi2
+  !
+  select case(cg_norm)
+  case default;stop "chi2_fitgf_general_normal error: cg_norm != [elemental,frobenius]"
+  case ("elemental");dchi2 = grad_chi2_delta_general_normal_elemental(a)
+  case ("frobenius");dchi2 = grad_chi2_delta_general_normal_frobenius(a)
+  end select
+  !
+end function grad_chi2_delta_general_normal
+
 function grad_chi2_delta_general_normal_elemental(a) result(dchi2)
   real(8),dimension(:)                                       :: a
   real(8),dimension(size(a))                                 :: dchi2
@@ -138,73 +193,11 @@ function grad_chi2_delta_general_normal_elemental(a) result(dchi2)
   enddo
   !
   do ia=1,size(a)
-     dchi2(ia) = +cg_pow * sum( df(:,:,:,:,ia) / Wmat, Hmask)
+     dchi2(ia) = +cg_pow * sum( df(:,:,:,:,ia) / Wmat, Hmask) !the + here is inconsistent
      dchi2(ia) = dchi2(ia) / Ldelta / count(Hmask) 
   enddo
   !
 end function grad_chi2_delta_general_normal_elemental
-
-
-
-
-
-!SUPERC?
-
-
-
-!+-----------------------------------------------------------------+
-!+-----------------------------------------------------------------+
-!+-----------------------------------------------------------------+
-
-
-
-!NORMAL
-!> FROBENIUS NORM: global \chi^2 for all components, only i\omega are weighted
-function chi2_delta_general_normal_frobenius(a) result(chi2)
-  real(8),dimension(:)                                           :: a
-  real(8)                                                        :: chi2
-  real(8),dimension(Ldelta)                                      :: chi2_freq
-  complex(8),dimension(Nspin,Nspin,Nimp,Nimp,Ldelta)             :: Delta
-  complex(8),dimension(Nspin*Nimp,Nspin*Nimp)                    :: Delta_lso
-  integer                                                        :: l
-  !
-  Delta = delta_general_normal(a)
-  !
-  do l=1,Ldelta
-     Delta_lso    =  nn2so_reshape(delta(:,:,:,:,l) - FGmatrix(:,:,:,:,l),Nspin,Nimp)
-     chi2_freq(l) =  sqrt(trace(matmul(Delta_lso,conjg(transpose(Delta_lso)))))
-  enddo
-  !
-  chi2 = sum(chi2_freq**cg_pow/Wdelta) !Weighted sum over matsubara frqs
-  chi2 = chi2/Ldelta/(Nspin*Nimp)      !Normalization over {iw} and Nlso
-  !
-end function chi2_delta_general_normal_frobenius
-
-!SUPERC
-function chi2_delta_general_superc_frobenius(a) result(chi2)
-  real(8),dimension(:)                                 :: a
-  real(8)                                              :: chi2
-  real(8),dimension(2,Ldelta)                          :: chi2_freq
-  complex(8),dimension(2,Nspin,Nspin,Nimp,Nimp,Ldelta) :: Delta
-  complex(8),dimension(2,Nspin*Nimp,Nspin*Nimp)        :: D,F
-  integer                                              :: l
-  !
-  Delta = delta_general_superc(a)
-  !
-  do l=1,Ldelta
-     D    =  nn2so_reshape(delta(1,:,:,:,:,l) - FGmatrix(:,:,:,:,l),Nspin,Nimp)
-     F    =  nn2so_reshape(delta(2,:,:,:,:,l) - FFmatrix(:,:,:,:,l),Nspin,Nimp)          
-     chi2_freq(l) =  &
-          sqrt(trace(matmul(D,conjg(transpose(D)))))  + &
-          sqrt(trace(matmul(F,conjg(transpose(F)))))
-  enddo
-  !
-  chi2 = sum(chi2_freq**cg_pow/Wdelta) !Weighted sum over matsubara frqs
-  chi2 = chi2/Ldelta/(Nspin*Nimp)      !Normalization over {iw} and Nlso
-  !
-end function chi2_delta_general_superc_frobenius
-
-
 
 !NORMAL
 function grad_chi2_delta_general_normal_frobenius(a) result(dchi2)
@@ -248,4 +241,6 @@ end function grad_chi2_delta_general_normal_frobenius
 
 
 
-!SUPERC??
+!######################################################################
+! DELTA GRAD chi2: SUPERC ??
+!######################################################################

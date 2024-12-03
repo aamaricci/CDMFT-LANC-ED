@@ -33,13 +33,12 @@ MODULE ED_BATH_REPLICA
      !  * rank-1, dimensions: [ |Nsym| ] Legacy support: degenerate parameters. deprecated.
      !
      module procedure init_Hbath_symmetries_d7
-     module procedure init_Hbath_symmetries_d6
      module procedure init_Hbath_symmetries_d5
      module procedure init_Hbath_symmetries_d3
      module procedure init_Hbath_symmetries_LEGACY ! (deprecation-cycle)
-     module procedure init_Hbath_direct_d6         !only *normal* deprecated
-     module procedure init_Hbath_direct_d4         !only *normal* deprecated
-     module procedure init_Hbath_direct_d2         !only *normal* deprecated
+     module procedure init_Hbath_direct_lso6         !only *normal* deprecated
+     module procedure init_Hbath_direct_lso4         !only *normal* deprecated
+     module procedure init_Hbath_direct_lso2         !only *normal* deprecated
   end interface set_Hbath
 
 
@@ -48,7 +47,7 @@ MODULE ED_BATH_REPLICA
   public :: set_Hbath
 
 
-
+  logical :: bool
   integer :: ibath
   integer :: inam,jnam
   integer :: ilat,jlat
@@ -57,6 +56,7 @@ MODULE ED_BATH_REPLICA
   integer :: is,js
   integer :: io,jo
   integer :: i,j
+  integer :: in,jn
 
 
 
@@ -135,17 +135,16 @@ contains
 
 
 
-  subroutine init_Hbath_symmetries_d7(Hvec,lambdavecs)
+  subroutine init_Hbath_symmetries_d7(Hvec,lambdavec)
     complex(8),dimension(:,:,:,:,:,:,:)   :: Hvec       ![Nambu,Nambu,Nspin,Nspin,Nimp,Nimp][Nsym]
-    real(8),dimension(:,:)                :: lambdavecs ![Nbath,Nsym]
+    real(8),dimension(:,:)                :: lambdavec ![Nbath,Nsym]
     integer                               :: isym,Nsym,ibath
-    integer                               :: in,jn,ispin,jspin,iorb,jorb,i,j
     complex(8),dimension(:,:),allocatable :: H
     !
     call assert_shape(Hvec,[Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(lambdavec,2)],"init_Hbath_symmetries_d7","Hvec")
     !
     Nsym=size(lambdavec,2)
-    if(size(lambdavecs(:,1))/=Nbath) stop "init_Hbath_symmetries_d7 ERROR: size(lambdavec,1) != Nbath"
+    if(size(lambdavec(:,1))/=Nbath) stop "init_Hbath_symmetries_d7 ERROR: size(lambdavec,1) != Nbath"
     !
     call allocate_Hbath(Nsym)
     !
@@ -155,16 +154,16 @@ contains
        do isym=1,Nsym
           bool = check_herm(Hvec(1,1,:,:,:,:,isym))
           if(.not.bool)stop "init_Hbath_symmetries_d7 ERROR: not Hermitian of replica basis O_"//str(isym)
-          Hbath_lambda(:,isym) = lambdavecs(:,isym)
+          Hbath_lambda(:,isym) = lambdavec(:,isym)
           Hbath_basis(isym)%O  = Hvec(:,:,:,:,:,:,isym)
        enddo
     case("superc")
        if(Nambu==1)stop "init_Hbath_symmetries_d7 ERROR: Nambu=1 with ed_mode=superc"
        do isym=1,Nsym
-          bool = check_nambu(Hvec(:,:,:,:,:,:,isym)
+          bool = check_nambu(Hvec(:,:,:,:,:,:,isym))
           if(.not.bool) stop "init_Hbath_symmetries_d7 ERROR: not Nambu of replica basis O_"//str(isym)
           !
-          Hbath_lambda(:,isym) = lambdavecs(:,isym)
+          Hbath_lambda(:,isym) = lambdavec(:,isym)
           Hbath_basis(isym)%O  = Hvec(:,:,:,:,:,:,isym)
        enddo
     end select
@@ -181,17 +180,16 @@ contains
 
 
 
-  subroutine init_Hbath_symmetries_d5(Hvec,lambdavecs)
+  subroutine init_Hbath_symmetries_d5(Hvec,lambdavec)
     complex(8),dimension(:,:,:,:,:)       :: Hvec       ![Nspin,Nspin,Nimp,Nimp][Nsym]
-    real(8),dimension(:,:)                :: lambdavecs ![Nbath,Nsym]
+    real(8),dimension(:,:)                :: lambdavec ![Nbath,Nsym]
     integer                               :: isym,Nsym,ibath
-    integer                               :: in,jn,ispin,jspin,iorb,jorb,i,j
     complex(8),dimension(:,:),allocatable :: H
     !
     call assert_shape(Hvec,[Nspin,Nspin,Nimp,Nimp,size(lambdavec,2)],"init_Hbath_symmetries_d5","Hvec")
     !
     Nsym=size(lambdavec,2)
-    if(size(lambdavecs(:,1))/=Nbath) stop "init_Hbath_symmetries_d5 ERROR: size(lambdavec,1) != Nbath"
+    if(size(lambdavec(:,1))/=Nbath) stop "init_Hbath_symmetries_d5 ERROR: size(lambdavec,1) != Nbath"
     !
     call allocate_Hbath(Nsym)
     !
@@ -200,7 +198,7 @@ contains
        do isym=1,Nsym
           bool = check_herm(Hvec(:,:,:,:,isym))
           if(.not.bool) stop "init_Hbath_symmetries_d5 ERROR: not Hermitian of replica basis O_"//str(isym)
-          Hbath_lambda(:,isym) = lambdavecs(:,isym)
+          Hbath_lambda(:,isym) = lambdavec(:,isym)
           Hbath_basis(isym)%O(1,1,:,:,:,:)  = Hvec(:,:,:,:,isym)
        enddo
     case("superc")
@@ -219,15 +217,15 @@ contains
 
 
 
-  subroutine init_Hbath_symmetries_d3(Hvec,lambdavecs)
+  subroutine init_Hbath_symmetries_d3(Hvec,lambdavec)
     complex(8),dimension(:,:,:) :: Hvec       ![Ntot,Ntot,Nsym] /Ntot = Nambu*Nspin*Nimp
-    real(8),dimension(:,:)      :: lambdavecs ![Nbath,Nsym]
+    real(8),dimension(:,:)      :: lambdavec ![Nbath,Nsym]
     integer                     :: isym,Nsym,ibath
     !
     call assert_shape(Hvec,[Nambu*Nspin*Nimp,Nambu*Nspin*Nimp,size(lambdavec,2)],"init_Hbath_symmetries_d3","Hvec")
     !
     Nsym=size(lambdavec,2)
-    if(size(lambdavecs(:,1))/=Nbath) stop "init_Hbath_symmetries_d3 ERROR: size(lambdavec,1) != Nbath"
+    if(size(lambdavec(:,1))/=Nbath) stop "init_Hbath_symmetries_d3 ERROR: size(lambdavec,1) != Nbath"
     !
     call allocate_Hbath(Nsym)
     !
@@ -236,14 +234,14 @@ contains
        do isym=1,Nsym
           bool = check_herm(Hvec(:,:,isym))
           if(.not.bool) stop "init_Hbath_symmetries_d3 ERROR: not Hermitian of replica basis O_"//str(isym)
-          Hbath_lambda(:,isym) = lambdavecs(:,isym)          
-          Hbath_basis(isym)%O(1,1,:,:,:,:)  = nso2nn_reshape(Hvec(:,:,isym),Nspin,Nimp)
+          Hbath_lambda(:,isym) = lambdavec(:,isym)          
+          Hbath_basis(isym)%O(1,1,:,:,:,:)  = so2nn_reshape(Hvec(:,:,isym),Nspin,Nimp)
        enddo
     case("superc")
        do isym=1,Nsym
-          bool = check_nambu(Hvec(:,:,isym))
+          bool = check_nambu(Hvec(:,:,isym),Nspin*Nimp)
           if(.not.bool) stop "init_Hbath_symmetries_d3 ERROR: not Nambu of replica basis O_"//str(isym)
-          Hbath_lambda(:,isym) = lambdavecs(:,isym)
+          Hbath_lambda(:,isym) = lambdavec(:,isym)
           do concurrent(in=1:Nambu,jn=1:Nambu,ispin=1:Nspin,jspin=1:Nspin,iorb=1:Nimp,jorb=1:Nimp)
              i = iorb + (ispin-1)*Nimp + (in-1)*Nspin*Nimp
              j = jorb + (jspin-1)*Nimp + (jn-1)*Nspin*Nimp
@@ -265,10 +263,10 @@ contains
 
 
   subroutine init_Hbath_symmetries_LEGACY(Hvec,lambdavec)
-    complex(8),dimension(:,:,:,:,:,:,:) :: Hvec      ![Nambu,Nambu,Nspin,Nspin,Nimp,Nimp][Nsym]
-    real(8),dimension(:)                :: lambdavec ![Nsym]
-    integer                             :: isym,Nsym,ibath
-    complex(8),dimension(:,:),allocatable         :: H
+    complex(8),dimension(:,:,:,:,:,:,:)   :: Hvec      ![Nambu,Nambu,Nspin,Nspin,Nimp,Nimp][Nsym]
+    real(8),dimension(:)                  :: lambdavec ![Nsym]
+    integer                               :: isym,Nsym,ibath
+    complex(8),dimension(:,:),allocatable :: H
     !
     Nsym=size(lambdavec)
     !
@@ -426,14 +424,14 @@ contains
                       counter=counter+1
                       Hbath_basis(counter)%O(1,1,ispin,jspin,iorb,jorb)=one
                       Hbath_basis(counter)%O(1,1,ispin,jspin,jorb,iorb)=one
-                      Hbath_lambda(:,counter)=dreal(Hloc(1,1,ispin,ispin,iorb,jorb))
+                      Hbath_lambda(:,counter)=dreal(Hloc(ispin,ispin,iorb,jorb))
                    endif
                    !
                    if(dimag(Hloc(ispin,jspin,iorb,jorb))/=0d0)then
                       counter=counter+1
                       Hbath_basis(counter)%O(1,1,ispin,jspin,iorb,jorb)=xi
                       Hbath_basis(counter)%O(1,1,ispin,jspin,jorb,iorb)=xi
-                      Hbath_lambda(:,counter)=dimag(Hloc(1,1,ispin,ispin,iorb,jorb))
+                      Hbath_lambda(:,counter)=dimag(Hloc(ispin,ispin,iorb,jorb))
                    endif
                 endif
              enddo
@@ -506,6 +504,13 @@ contains
   end subroutine init_Hbath_direct_lso2
 
 
+
+
+  function index_stride_lso(ilat,ispin,iorb) result(io)
+    integer :: ilat,ispin,iorb
+    integer :: io
+    io = iorb + (ilat-1)*Norb + (ispin-1)*Norb*Nlat
+  end function index_stride_lso
 
 
 END MODULE ED_BATH_REPLICA

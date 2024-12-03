@@ -1,6 +1,6 @@
   do jdw=1,MpiQup
      do jup=1,DimDw
-        mdw  = Hs(2)%map(jup)
+        mdw  = Hsector%H(2)%map(jup)
         ndw  = bdecomp(mdw,Ns)
         !
         j    = jup + (jdw-1)*DimDw
@@ -35,7 +35,7 @@
                  ialfa = getBathStride(iorb,ibath)
                  ibeta = getBathStride(jorb,ibath)
                  Jcondition = &
-                      (hbath_tmp(Nspin,Nspin,iorb,jorb,ibath)/=zero) .AND. &
+                      (hbath_tmp(1,1,Nspin,Nspin,iorb,jorb,ibath)/=zero) .AND. &
                       (ndw(ibeta)==1) .AND. (ndw(ialfa)==0)
                  !
                  if (Jcondition)then
@@ -44,7 +44,7 @@
                     iup = binary_search(Hsector%H(2)%map,k2)
                     idw = jdw
                     i   = iup + (idw-1)*DimDw
-                    htmp = hbath_tmp(Nspin,Nspin,iorb,jorb,ibath)*sg1*sg2
+                    htmp = hbath_tmp(1,1,Nspin,Nspin,iorb,jorb,ibath)*sg1*sg2
                     !
                     hvt(i) = hvt(i) + htmp*vt(j)
                     !
@@ -89,26 +89,26 @@
         !!
         !F_0. T^0_ab :=   F_0 . (+ C^+_{a,dw}C_{b,dw})
         !F_z. T^z_ab :=   F_z . (- C^+_{a,dw}C_{b,dw})
-        if(any(exc_field/=0d0))then
-           do iorb=1,Nimp
-              do jorb=iorb+1,Nimp
-                 Jcondition = (Ndw(jorb)==1) .AND. (Ndw(iorb)==0)
-                 if (Jcondition) then
-                    call c(jorb,mdw,k1,sg1)
-                    call cdg(iorb,k1,k2,sg2)
-                    iup = binary_search(Hsector%H(2)%map,k2)
-                    idw = jdw
-                    i   = iup + (idw-1)*DimDw
-                    !
-                    htmp = exc_field(1)*sg1*sg2
-                    Hv(i) = Hv(i) + htmp*vin(j)
-                    !
-                    htmp = -exc_field(4)*sg1*sg2
-                    Hv(i) = Hv(i) + htmp*vin(j)
-                 endif
-              enddo
-           enddo
-        endif
+        ! if(any(exc_field/=0d0))then
+        !    do iorb=1,Nimp
+        !       do jorb=iorb+1,Nimp
+        !          Jcondition = (Ndw(jorb)==1) .AND. (Ndw(iorb)==0)
+        !          if (Jcondition) then
+        !             call c(jorb,mdw,k1,sg1)
+        !             call cdg(iorb,k1,k2,sg2)
+        !             iup = binary_search(Hsector%H(2)%map,k2)
+        !             idw = jdw
+        !             i   = iup + (idw-1)*DimDw
+        !             !
+        !             htmp = exc_field(1)*sg1*sg2
+        !             Hv(i) = Hv(i) + htmp*vin(j)
+        !             !
+        !             htmp = -exc_field(4)*sg1*sg2
+        !             Hv(i) = Hv(i) + htmp*vin(j)
+        !          endif
+        !       enddo
+        !    enddo
+        ! endif
 
 
         !

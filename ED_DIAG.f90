@@ -1,7 +1,7 @@
 MODULE ED_DIAG
   USE ED_INPUT_VARS
   USE ED_DIAG_NORMAL
-  USE ED_DIAG_NONSU2
+  ! USE ED_DIAG_SUPERC
   !
   implicit none
   private
@@ -24,7 +24,7 @@ contains
     write(LOGfile,"(A)")"Diagonalize impurity problem:"
     select case(ed_mode)
     case default  ;call diagonalize_impurity_normal()
-    case("superc");call diagonalize_impurity_superc()
+    ! case("superc");call diagonalize_impurity_superc()
     end select
 #ifdef _DEBUG
     write(Logfile,"(A)")""

@@ -1,11 +1,16 @@
 MODULE ED_BATH_FUNCTIONS
   USE SF_CONSTANTS, only: zero
   USE SF_IOTOOLS, only:free_unit,reg,file_length,str
-  USE SF_LINALG, only: eye,inv,zeye,inv_her
+  USE SF_LINALG, only: eye,inv,zeye,diag,kron
+  USE SF_SPIN
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
-  USE ED_BATH
   USE ED_AUX_FUNX
+  USE ED_BATH_AUX
+  USE ED_BATH_DIM
+  USE ED_BATH_USER
+  USE ED_BATH_DMFT
+  USE ED_BATH_REPLICA
   implicit none
 
   private
@@ -74,9 +79,9 @@ contains
     type(effective_bath)                                            :: dmft_bath_ !the current :f:var:`effective_bath` instance
     character(len=*),optional                                       :: axis       !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(x)) :: Delta
-    ! complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)         :: JJ
     complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)         :: Vk
     complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)         :: Hk,invHk
+    complex(8),dimension(Nambu*Nspin*Nimp,size(x))                  :: zeta
     character(len=4)                                                :: axis_
     !
     axis_="mats";if(present(axis))axis_=str(axis)
@@ -92,7 +97,7 @@ contains
        if(Nambu/=1)stop "delta_bath_array ERROR: Nambu != 1 with ed_mode=normal"
        do ibath=1,Nbath
           Vk = one*diag(dmft_bath%item(ibath)%v(:))
-          Hk = nnn2nso_reshape(Hbath_build(dmft_Bath%item(ibath)%lambda)) !rank6 -> rank2
+          Hk = nnn2nso_reshape( Hbath_build(dmft_Bath%item(ibath)%lambda) ) !rank6 -> rank2
           do i=1,L
              invHk = zeye(Ntot)*x(i) - Hk
              call inv(invHk)
@@ -102,15 +107,12 @@ contains
        enddo
     case ("superc")             !treat all the 2x2 Nambu components at once
        if(Nambu/=2)stop "delta_bath_array ERROR: Nambu != 2 with ed_mode=superc"
-       ! select case(axis_)
-       ! case default ; JJ=zeye(Ntot)
-       ! case ('real'); JJ=kron(pauli_sigma_z,zeye(Nspin*Nimp))
-       ! end select
+       zeta=zeta_superc(x,0d0,axis_)
        do ibath=1,Nbath
           Vk = kron(pauli_sigma_z,one*diag(dmft_bath_%item(ibath)%v(:)))
           Hk = nnn2nso_reshape(Hbath_build(dmft_Bath%item(ibath)%lambda)) !rank6 -> rank2          
           do i=1,L
-             invHk   = diag(zeta_superc(x,0d0,axis_)) - Hk !x(i)*JJ - Hk
+             invHk   = diag(zeta(:,i)) - Hk
              call inv(invHk)
              invHk   = matmul(matmul(Vk,invHk),Vk)
              Delta(:,:,:,:,:,:,i) = Delta(:,:,:,:,:,:,i) + nso2nnn_reshape(invHk)
@@ -132,7 +134,7 @@ contains
     character(len=*),optional                                       :: axis !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis    
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(x)) :: invG0and,Delta
     character(len=4)                                                :: axis_    
-    complex(8),dimension(Nnambu*Nspin*Nimp,Nnambu*Nspin*Nimp)       :: iG0
+    complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)       :: iG0
     complex(8),dimension(Nambu*Nspin*Nimp,size(x))                  :: zeta
     !
     axis_="mats";if(present(axis))axis_=str(axis)
@@ -152,7 +154,7 @@ contains
        enddo
     case ("superc")             !treat all the 2x2 Nambu components at once
        if(Nambu/=2)stop "delta_bath_array ERROR: Nambu != 2 with ed_mode=superc"
-       zeta = zeta_superc(x,mu,axis_)
+       zeta = zeta_superc(x,xmu,axis_)
        do i=1,L
           invG0and(:,:,:,:,:,:,i) = nso2nnn_reshape(diag(zeta(:,i))) -  hloc_superc(impHloc) - Delta(:,:,:,:,:,:,i)
        enddo
@@ -172,14 +174,14 @@ contains
     character(len=*),optional                                       :: axis !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis
     character(len=4)                                                :: axis_    
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(x)) :: G0and
-    complex(8),dimension(Nnambu*Nspin*Nimp,Nnambu*Nspin*Nimp)       :: iG0
+    complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)       :: iG0
     !
     axis_="mats";if(present(axis))axis_=str(axis)
     !
     L     = size(x)
     Ntot  = Nambu*Nspin*Nimp
     !
-    G0and = invg0_bath(x,dmft_bath_,axis_)
+    G0and = invg0_bath_array(x,dmft_bath_,axis_)
     !
     do i=1,L
        iG0=nnn2nso_reshape(G0and(:,:,:,:,:,:,i))
@@ -212,13 +214,13 @@ contains
     N = Nspin*Nimp
     L = size(x)
     do concurrent(iorb=1:N)
-       select case(axis_)
+       select case(axis)
        case default
           zeta(iorb ,1:L)   = x(1:L) + mu
           zeta(N+iorb,1:L)  = x(1:L) - mu
        case ('real')
           zeta(iorb ,1:L)   = x(1:L) + mu
-          zeta(N+iorb:,1:L) = -conjg(x(L:1:-1) + mu)
+          zeta(N+iorb,1:L) = -conjg(x(L:1:-1) + mu)
        end select
     enddo
   end function zeta_superc

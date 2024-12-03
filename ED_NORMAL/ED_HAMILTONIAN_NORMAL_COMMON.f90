@@ -1,10 +1,12 @@
-MODULE ED_HAMILTONIAN_COMMON
+MODULE ED_HAMILTONIAN_NORMAL_COMMON
   USE SF_MISC,    only: assert_shape
   USE SF_LINALG,  only: kronecker_product,eye
   USE ED_INPUT_VARS
+  USE ED_AUX_FUNX
   USE ED_VARS_GLOBAL
   USE ED_BATH
   USE ED_SETUP
+  USE ED_SECTOR
   implicit none
 
   !
@@ -27,11 +29,11 @@ MODULE ED_HAMILTONIAN_COMMON
   integer                                   :: m,mup,mdw
   integer                                   :: ms
   integer                                   :: impi
-  integer                                   :: iorb,jorb,ispin,jspin,ibath
+  integer                                   :: iorb,jorb,ispin,jspin,ibath,ilat,jlat
   integer                                   :: kp,k1,k2,k3,k4
   integer                                   :: ialfa,ibeta,indx
   real(8)                                   :: sg1,sg2,sg3,sg4
-  real(8)                                   :: htmp,htmpup,htmpdw
+  complex(8)                                :: htmp,htmpup,htmpdw
   logical                                   :: Jcondition
   integer                                   :: Nfoo
   real(8),dimension(:,:,:),allocatable      :: diag_hybr ![Nspin,Nimp,Nbath]
@@ -136,7 +138,7 @@ contains
 
 
 
-end MODULE ED_HAMILTONIAN_COMMON
+end MODULE ED_HAMILTONIAN_NORMAL_COMMON
 
 
 

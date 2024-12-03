@@ -1,7 +1,7 @@
 MODULE ED_FIT_GENERAL
   USE ED_FIT_COMMON
-  USE SF_SPIN, only: pauli_tau_z,pauli_sigma_z
-  USE SF_LINALG, only: kron
+  USE SF_SPIN
+  USE SF_LINALG, only: kron,diag,inv
 
 
 
@@ -47,13 +47,13 @@ contains
        print *, "         be aware that CG_POW is not doing what you would expect for a chi^q"
     endif
     !
-    call allocate_dmft_bath()
-    call set_dmft_bath(bath_)
+    call allocate_dmft_bath(dmft_bath)
+    call set_dmft_bath(bath_,dmft_bath)
     allocate(array_bath(size(bath_)-1))
     Nlambdas   = nint(bath_(1))
     array_bath = bath_(2:)
     !
-    Ldelta = Lfit ; if(Ldelta>size(fg,7))Ldelta=size(fg,7)
+    Ldelta = Lfit ; if(Ldelta>size(fg,5))Ldelta=size(fg,5)
     !
     !
     allocate(FGmatrix(Nspin,Nspin,Nimp,Nimp,Ldelta))
@@ -178,14 +178,14 @@ contains
     close(unit)
     !
     bath_(Nbath+1:size(bath_))=array_bath
-    call set_dmft_bath(bath_)               ! *** bath_ --> dmft_bath ***    (per write fit result)
-    call write_dmft_bath(LOGfile)
-    call save_dmft_bath()
+    call set_dmft_bath(bath_,dmft_bath)               ! *** bath_ --> dmft_bath ***    (per write fit result)
+    call write_dmft_bath(dmft_bath,LOGfile)
+    call save_dmft_bath(dmft_bath)
     !
     call write_fit_result()
     !
-    call get_dmft_bath(bath_)               ! ***  dmft_bath --> bath_ ***    (bath in output)
-    call deallocate_dmft_bath()
+    call get_dmft_bath(dmft_bath,bath_)               ! ***  dmft_bath --> bath_ ***    (bath in output)
+    call deallocate_dmft_bath(dmft_bath)
     deallocate(FGmatrix,Hmask,Xdelta,Wdelta)
     deallocate(array_bath)
     !
@@ -424,10 +424,9 @@ contains
 
 
 
-  include "chi2_delta_general.f90"
-  include "delta_general.f90"
-
-  include "chi2_weiss_general.f90"
-  include "weiss_general.f90"
+  include "general/chi2_delta_general.f90"
+  include "general/chi2_weiss_general.f90"
+  include "general/delta_general.f90"
+  include "general/weiss_general.f90"
 
 end MODULE ED_FIT_GENERAL

@@ -26,7 +26,7 @@ contains
 
   subroutine ed_checks_global
     !
-    if(Nspin=2)stop "ED WARNING: Nspin=2 code has not been checked thoroughly. Replica bath does not support V_\sigma. Need development"
+    if(Nspin==2)stop "ED WARNING: Nspin=2 code has not been checked thoroughly. Replica bath does not support V_\sigma. Need development"
     if(Lfit>Lmats)Lfit=Lmats
     if(Nspin>2)stop "ED ERROR: Nspin > 2 is currently not supported"
     if(Norb>5)stop "ED ERROR: Norb > 5 is currently not supported"
@@ -68,6 +68,7 @@ contains
     Ns     = Nimp*(Nbath+1) !Total number of levels per spin
     Ns_Orb = Ns
     Ns_Ud  = 1
+    Nlevels= 2*Ns
     !
     select case(ed_mode)
     case default
@@ -89,7 +90,7 @@ contains
     ! Initialize the pool of variables and data structures of the ED calculation.
     ! Performs all the checks calling :f:func:`ed_checks_global`, set up the dimensions in :f:func:`ed_setup_dimensions` given the variables :f:var:`ns`, :f:var:`norb`, :f:var:`nspin`, :f:var:`nbath`, :f:var:`bath_type`. Allocate all the dynamic memory which will be stored in the memory till the calculation will be finalized. 
     logical                          :: control
-    integer                          :: i,iud,iorb,jorb,ispin,jspin
+    integer                          :: i,iud,iorb,jorb,ispin,jspin,dim_sector_max
     integer,dimension(:),allocatable :: DimUps,DimDws
     !
     call ed_checks_global
@@ -123,7 +124,7 @@ contains
        select case(ed_mode)
        case default
           write(LOGfile,"(A,"//str(Ns_Ud)//"I8,2X,"//str(Ns_Ud)//"I8,I20)")&
-               'Largest Sector(s)     = ',DimUps,DimDws,product(DimUps)*product(DimDws)*DimPh
+               'Largest Sector(s)     = ',DimUps,DimDws,product(DimUps)*product(DimDws)
        case("superc","nonsu2")
           write(LOGfile,"(A,I15)")'Largest Sector(s)    = ',dim_sector_max
        end select
@@ -196,33 +197,33 @@ contains
     !
     !
     !allocate functions
-    allocate(impSmats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
-    allocate(impSreal(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
-    ! allocate(impSAmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    ! allocate(impSAreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    ! impSAmats=zero
-    ! impSAreal=zero
-    impSmats=zero
-    impSreal=zero
-    !
-    allocate(impGmats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
-    allocate(impGreal(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
-    ! allocate(impFmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    ! allocate(impFreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    impGmats=zero
-    impGreal=zero
-    ! impFmats=zero
-    ! impFreal=zero
-    !
-    !allocate functions
-    allocate(impG0mats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
-    allocate(impG0real(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
-    ! allocate(impF0mats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
-    ! allocate(impF0real(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
-    impG0mats=zero
-    impG0real=zero
-    ! impF0mats=zero
-    ! impF0real=zero
+    ! allocate(impSmats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
+    ! allocate(impSreal(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
+    ! ! allocate(impSAmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
+    ! ! allocate(impSAreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
+    ! ! impSAmats=zero
+    ! ! impSAreal=zero
+    ! impSmats=zero
+    ! impSreal=zero
+    ! !
+    ! allocate(impGmats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
+    ! allocate(impGreal(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
+    ! ! allocate(impFmats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
+    ! ! allocate(impFreal(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
+    ! impGmats=zero
+    ! impGreal=zero
+    ! ! impFmats=zero
+    ! ! impFreal=zero
+    ! !
+    ! !allocate functions
+    ! allocate(impG0mats(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lmats))
+    ! allocate(impG0real(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Lreal))
+    ! ! allocate(impF0mats(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lmats))
+    ! ! allocate(impF0real(Nlat,Nlat,Nspin,Nspin,Norb,Norb,Lreal))
+    ! impG0mats=zero
+    ! impG0real=zero
+    ! ! impF0mats=zero
+    ! ! impF0real=zero
     !
     allocate(impGmatrix(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp))
     !
@@ -264,6 +265,7 @@ contains
     Ns_Orb   = 0
     Ns_Ud    = 0
     Nsectors = 0
+    Nlevels  = 0
     !
     if(MpiMaster)write(LOGfile,"(A)")"Cleaning ED structure"
     if(allocated(spH0ups))deallocate(spH0ups)
@@ -273,24 +275,24 @@ contains
     if(allocated(getSector))deallocate(getSector)
     if(allocated(getDim))deallocate(getDim)
     if(allocated(getSz))deallocate(getSz)
-    if(allocated(getN))deallocate(getN)
+    ! if(allocated(getN))deallocate(getN)
     if(allocated(getBathStride))deallocate(getBathStride)
     if(allocated(twin_mask))deallocate(twin_mask)
     if(allocated(sectors_mask))deallocate(sectors_mask)
     if(allocated(neigen_sector))deallocate(neigen_sector)
     if(allocated(impHloc))deallocate(impHloc)
-    if(allocated(impSmats))deallocate(impSmats)
-    if(allocated(impSreal))deallocate(impSreal)
-    ! if(allocated(impSAmats))deallocate(impSAmats)
-    ! if(allocated(impSAreal))deallocate(impSAreal)
-    if(allocated(impGmats))deallocate(impGmats)
-    if(allocated(impGreal))deallocate(impGreal)
-    ! if(allocated(impFmats))deallocate(impFmats)
-    ! if(allocated(impFreal))deallocate(impFreal)
-    if(allocated(impG0mats))deallocate(impG0mats)
-    if(allocated(impG0real))deallocate(impG0real)
-    ! if(allocated(impF0mats))deallocate(impF0mats)
-    ! if(allocated(impF0real))deallocate(impF0real)
+    ! if(allocated(impSmats))deallocate(impSmats)
+    ! if(allocated(impSreal))deallocate(impSreal)
+    ! ! if(allocated(impSAmats))deallocate(impSAmats)
+    ! ! if(allocated(impSAreal))deallocate(impSAreal)
+    ! if(allocated(impGmats))deallocate(impGmats)
+    ! if(allocated(impGreal))deallocate(impGreal)
+    ! ! if(allocated(impFmats))deallocate(impFmats)
+    ! ! if(allocated(impFreal))deallocate(impFreal)
+    ! if(allocated(impG0mats))deallocate(impG0mats)
+    ! if(allocated(impG0real))deallocate(impG0real)
+    ! ! if(allocated(impF0mats))deallocate(impF0mats)
+    ! ! if(allocated(impF0real))deallocate(impF0real)
     if(allocated(impGmatrix))deallocate(impGmatrix)
     if(allocated(ed_dens))deallocate(ed_dens)
     if(allocated(ed_docc))deallocate(ed_docc)
@@ -452,7 +454,7 @@ contains
     !Setup the local Fock space maps used in the ED calculation for the **superc** operative mode. All sectors dimensions, quantum numbers, twin sectors and list of requested eigensolutions for each sectors are defined here. Identify Bath positions stride for a given value of :code:`bath_type`. Determines the sector indices for :math:`\pm` -particle with :math:`\sigma=\uparrow,\downarrow`.
     integer                                           :: i,isz,in,dim,isector,jsector
     integer                                           :: sz,iorb,jsz
-    integer                                           :: unit,status,istate
+    integer                                           :: unit,status,istate,ibath,stride
     logical                                           :: IOfile
     integer                                           :: anint
     real(8)                                           :: adouble

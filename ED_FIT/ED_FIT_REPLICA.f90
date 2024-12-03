@@ -1,7 +1,7 @@
 MODULE ED_FIT_REPLICA
   USE ED_FIT_COMMON
-  USE SF_SPIN, only: pauli_tau_z,pauli_sigma_z
-  USE SF_LINALG, only: kron
+  USE SF_SPIN
+  USE SF_LINALG, only: kron,diag,inv
   !
   implicit none
   private
@@ -325,7 +325,7 @@ contains
     !
     if(cg_grad==0)then
        cg_grad=1
-       write(LOGfile,*)"WARNING: CGfit Superc does not support minimization with analytical gradient (cg_grad=0)."
+       write(LOGfile,*)"WARNING: REPLICA Superc does not support minimization with analytical gradient (cg_grad=0)."
        write(LOGfile,*)"         To spare you some time we fall back to numerical gradient: cg_grad=1"
        call sleep(2)
     endif
@@ -453,11 +453,10 @@ contains
 
 
 
-  include "chi2_delta_replica.f90"
-  include "delta_replica.f90"
-
-  include "chi2_weiss_replica.f90"
-  include "weiss_replica.f90"
+  include "replica/chi2_delta_replica.f90"
+  include "replica/chi2_weiss_replica.f90"
+  include "replica/delta_replica.f90"
+  include "replica/weiss_replica.f90"
 
   
 end MODULE ED_FIT_REPLICA

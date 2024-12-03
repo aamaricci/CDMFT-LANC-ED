@@ -1,13 +1,14 @@
 MODULE ED_IO
+  USE SF_LINALG
+  USE SF_ARRAYS, only: linspace,arange
+  USE SF_IOTOOLS, only: str,reg,free_unit,splot,sread
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX
   USE ED_SETUP
   USE ED_BATH
   USE ED_BATH_FUNCTIONS
-  USE SF_LINALG
-  USE SF_ARRAYS, only: linspace,arange
-  USE SF_IOTOOLS, only: str,reg,free_unit,splot,sread
+  USE ED_GREENS_FUNCTIONS
   implicit none
   private
 
@@ -150,7 +151,7 @@ MODULE ED_IO
      !
      module procedure :: ed_get_docc_d0
      module procedure :: ed_get_docc_d1
-     module procedure :: ed_get_docc_d3
+     module procedure :: ed_get_docc_d2
   end interface ed_get_docc
 
   interface ed_get_phi
@@ -162,9 +163,9 @@ MODULE ED_IO
      !  * [:f:var:`norb`]: if no optional variable is provided for single-impurity DMFT, :math:`\phi` for all orbitals
      !  * [:f:var:`nlat`, :f:var:`norb`]: if :f:var:`nlat` is provided for real-space DMFT, :math:`\phi` for all impurity sites and orbitals
      !
-     module procedure :: ed_get_phisc_d0
-     module procedure :: ed_get_phisc_d1
-     module procedure :: ed_get_phisc_d2
+     module procedure :: ed_get_phi_d0
+     module procedure :: ed_get_phi_d1
+     module procedure :: ed_get_phi_d2
   end interface ed_get_phi
 
 
@@ -320,16 +321,16 @@ MODULE ED_IO
      module procedure :: ed_get_single_particle_density_matrix_single
   end interface ed_get_sp_dm
 
-  !>>DA RIVEDERE<<
-  interface ed_gf_cluster
-     module procedure :: ed_gf_cluster_scalar
-     module procedure :: ed_gf_cluster_array
-  end interface ed_gf_cluster
+  ! !>>DA RIVEDERE<<
+  ! interface ed_gf_cluster
+  !    module procedure :: ed_gf_cluster_scalar
+  !    module procedure :: ed_gf_cluster_array
+  ! end interface ed_gf_cluster
 
 
-  interface ed_read_impsigma
-     module procedure :: ed_read_impsigma_single
-  end interface ed_read_impsigma
+  ! interface ed_read_impsigma
+  !    module procedure :: ed_read_impsigma_single
+  ! end interface ed_read_impsigma
 
   interface ed_print_dm
      module procedure :: ed_print_dm_orb
@@ -343,8 +344,8 @@ MODULE ED_IO
   public :: ed_get_g0and
   public :: ed_get_delta
 
-  public :: ed_build_gimp
-  public :: ed_build_sigma
+  ! public :: ed_build_gimp
+  ! public :: ed_build_sigma
 
   public :: ed_get_dens
   public :: ed_get_mag
@@ -370,7 +371,6 @@ MODULE ED_IO
 
   !Frequency and time arrays:
   !=========================================================
-  real(8),dimension(:),allocatable :: wm,tau,wr,vm
   character(len=64)                :: suffix
 
 
@@ -392,27 +392,27 @@ contains
   !+--------------------------------------------------------------------------+!
   ! PURPOSE: Retrieve measured values of the impurity functions
   !+--------------------------------------------------------------------------+!
-  include "ED_IO/get_sigma.f90"
-  include "ED_IO/get_gimp.f90"
-  include "ED_IO/get_g0imp.f90"
-  include "ED_IO/get_gand_bath.f90"
+  include "get_sigma.f90"
+  include "get_gimp.f90"
+  include "get_g0imp.f90"
+  include "get_gand_bath.f90"
 
 
   !+--------------------------------------------------------------------------+!
   ! PURPOSE: Retrieve measured values of the local observables
   !+--------------------------------------------------------------------------+!
-  include "ED_IO/observables/get_dens.f90"
-  include "ED_IO/observables/get_mag.f90"
-  include "ED_IO/observables/get_docc.f90"
-  include "ED_IO/observables/get_phi.f90"
-  include "ED_IO/observables/get_energy.f90"
-  include "ED_IO/observables/get_doubles.f90"
+  include "observables/get_dens.f90"
+  include "observables/get_mag.f90"
+  include "observables/get_docc.f90"
+  include "observables/get_phi.f90"
+  include "observables/get_energy.f90"
+  include "observables/get_doubles.f90"
 
   !+--------------------------------------------------------------------------+!
   ! PURPOSE: RDMs
   !+--------------------------------------------------------------------------+!
-  include "ED_IO/rdm/get_rdm.f90"
-  include "ED_IO/rdm/get_sp_dm.f90"
+  include "rdm/get_rdm.f90"
+  include "rdm/get_sp_dm.f90"
 
 
 
@@ -513,7 +513,7 @@ contains
 
 
 
-  
+
 
 END MODULE ED_IO
 

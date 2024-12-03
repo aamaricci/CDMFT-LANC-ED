@@ -7,12 +7,12 @@ MODULE ED_HAMILTONIAN_NORMAL_STORED_HxV
 
 
   !>Sparse Matric constructors
-  public :: ed_buildh_main
+  public :: ed_buildh_normal_main
 
   !>Sparse Mat-Vec product using stored sparse matrix
-  public  :: spMatVec_main
+  public  :: spMatVec_normal_main
 #ifdef _MPI
-  public  :: spMatVec_MPI_main
+  public  :: spMatVec_MPI_normal_main
 #endif
 
 
@@ -37,9 +37,8 @@ contains
     integer                                                       :: isector   
     complex(8),dimension(:,:),allocatable                         :: Htmp_up,Htmp_dw,Hrdx
     integer,dimension(Ns)                                         :: ibup,ibdw
-    integer,dimension(Nlat,Norb)                                  :: Nup,Ndw
+    integer,dimension(Nimp)                                       :: Nup,Ndw
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Nbath) :: Hbath_tmp
-
     !
     nup=zero
     ndw=zero
@@ -163,11 +162,11 @@ contains
     ! Serial version of the matrix-vector product :math:`\vec{w}=H\times\vec{v}` used in Arpack/Lanczos algorithm for :f:var:`ed_total_ud` = :code:`True` 
     ! This procedures applies one by one each term of the global Hamiltonian to an input vector using the stored sparse matrices.  
     !
-    integer                 :: Nloc !Global dimension of the problem. :code:`size(v)=Nloc=size(Hv)`
-    real(8),dimension(Nloc) :: v    !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
-    real(8),dimension(Nloc) :: Hv   !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
-    complex(8)              :: val
-    integer                 :: i,iup,idw,j,jup,jdw,jj
+    integer                    :: Nloc !Global dimension of the problem. :code:`size(v)=Nloc=size(Hv)`
+    complex(8),dimension(Nloc) :: v    !input vector (passed by Arpack/Lanczos) :math:`\vec{v}`
+    complex(8),dimension(Nloc) :: Hv   !output vector (required by Arpack/Lanczos) :math:`\vec{w}`
+    complex(8)                 :: val
+    integer                    :: i,iup,idw,j,jup,jdw,jj
     !
     !
     Hv=zero
@@ -231,8 +230,8 @@ contains
     ! This procedures applies one by one each term of the global Hamiltonian to a part of the vector own by the thread using the stored sparse matrices.
     !
     integer                             :: Nloc !Local dimension of the vector chunk. :code:`size(v)=Nloc` with :math:`\sum_p` :f:var:`Nloc` = :f:var:`Dim`
-    real(8),dimension(Nloc)             :: v    !input vector part (passed by P-Arpack/P-Lanczos) :math:`\vec{v}`
-    real(8),dimension(Nloc)             :: Hv   !output vector (required by P-Arpack/P-Lanczos) :math:`\vec{w}`
+    complex(8),dimension(Nloc)          :: v    !input vector part (passed by P-Arpack/P-Lanczos) :math:`\vec{v}`
+    complex(8),dimension(Nloc)          :: Hv   !output vector (required by P-Arpack/P-Lanczos) :math:`\vec{w}`
     !
     integer                             :: N
     complex(8),dimension(:),allocatable :: vt,Hvt

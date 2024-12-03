@@ -93,7 +93,8 @@ MODULE ED_VARS_GLOBAL
 
 
   type GFmatrix
-     type(GFchannel),dimension(:),allocatable                :: state !state_list%size = # of state in the spectrum 
+     type(GFchannel),dimension(:),allocatable                :: state !state_list%size = # of state in the spectrum
+     logical                                                 :: status=.false.
   end type GFmatrix
 
 
@@ -163,7 +164,7 @@ MODULE ED_VARS_GLOBAL
   integer,save                                           :: Nsectors !Number of sectors
   integer,save                                           :: Ns_orb
   integer,save                                           :: Ns_ud
-  !
+  integer                                                :: Nlevels
   integer                                                :: Nimp     !Total number of levels in the impurity cluster: Nlat*Norb
   integer                                                :: Nambu   !Global Nambu factor for SC calculations
   
@@ -253,6 +254,7 @@ MODULE ED_VARS_GLOBAL
   real(8),dimension(:),allocatable                       :: ed_dens
   real(8),dimension(:),allocatable                       :: ed_dens_up,ed_dens_dw
   real(8),dimension(:),allocatable                       :: ed_docc
+  real(8),dimension(:),allocatable                       :: ed_phisc
   real(8),dimension(:),allocatable                       :: ed_mag
   real(8)                                                :: ed_Epot
   real(8)                                                :: ed_Eint
@@ -367,6 +369,7 @@ contains
     integer        :: Nstate
     if(allocated(self%state))deallocate(self%state)
     allocate(self%state(Nstate))
+    self%status=.true.
   end subroutine allocate_gfmatrix_Nstate
 
   subroutine allocate_gfmatrix_Nchan(self,istate,Nchan)
@@ -464,7 +467,7 @@ contains
           do i3=1,size(self,3)
              do i4=1,size(self,4)
                 do i5=1,size(self,5)
-                   call deallocate_gfmatrix_single(self(i1,i2,i3,i4i5))
+                   call deallocate_gfmatrix_single(self(i1,i2,i3,i4,i5))
                 enddo
              enddo
           enddo

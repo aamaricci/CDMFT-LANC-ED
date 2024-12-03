@@ -18,12 +18,10 @@ MODULE ED_GF_NORMAL
 
 
   interface get_Gimp_normal
-     module procedure :: get_Gimp_normal_scalar
      module procedure :: get_Gimp_normal_array
   end interface get_Gimp_normal
 
   interface get_Sigma_normal
-     module procedure :: get_Sigma_normal_scalar
      module procedure :: get_Sigma_normal_array
   end interface get_Sigma_normal
 
@@ -33,21 +31,28 @@ MODULE ED_GF_NORMAL
   public :: get_Sigma_normal
 
 
-  integer                   :: istate
-  integer                   :: isector,jsector
-  integer                   :: idim,idimUP,idimDW
-  integer                   :: jdim,jdimUP,jdimDW
-  complex(8),allocatable    :: vvinit(:)
-  real(8),allocatable       :: alfa_(:),beta_(:)
-  integer                   :: ialfa,ibeta
-  integer                   :: jalfa,jbeta
-  integer                   :: r
-  integer                   :: i,iup,idw
-  integer                   :: j,jup,jdw  
-  integer                   :: m,mup,mdw
-  real(8)                   :: sgn,norm2,norm0
-  integer                   :: Nitermax,Nlanc,vecDim
-
+  integer                               :: istate
+  integer                               :: isector,jsector
+  integer                               :: idim,idimUP,idimDW
+  integer                               :: jdim,jdimUP,jdimDW
+  complex(8),allocatable                :: vvinit(:)
+  real(8),allocatable                   :: alfa_(:),beta_(:)
+  integer                               :: ialfa,ibeta
+  integer                               :: jalfa,jbeta
+  integer                               :: r,m
+  real(8)                               :: sgn,norm2,norm0
+  integer                               :: Nitermax,Nlanc,vecDim
+  integer                               :: in,jn
+  integer                               :: inam,jnam
+  integer                               :: ilat,jlat
+  integer                               :: iorb,jorb
+  integer                               :: ispin,jspin
+  integer                               :: is,js
+  integer                               :: io,jo
+  integer                               :: i,j
+  integer                               :: iup,idw
+  integer                               :: jup,jdw  
+  integer                               :: mup,mdw
 
   !Lanczos shared variables
   !=========================================================
@@ -56,21 +61,7 @@ MODULE ED_GF_NORMAL
 
 
 
-  !AUX GF
-  !=========================================================
-  complex(8),allocatable,dimension(:,:) :: auxGmats,auxGreal
 
-
-
-
-  integer :: in,jn
-  integer :: inam,jnam
-  integer :: ilat,jlat
-  integer :: iorb,jorb
-  integer :: ispin,jspin
-  integer :: is,js
-  integer :: io,jo
-  integer :: i,j
 
 contains
 
@@ -401,18 +392,22 @@ contains
   !############################################################################################
   !############################################################################################
 
-  function get_Gimp_normal_scalar(zeta) result(Gf)
-    complex(8),intent(in)                                   :: zeta
-    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: Gf
-    complex(8)                                              :: green
-    integer                                                 :: ispin
-    integer                                                 :: ilat,jlat
-    integer                                                 :: iorb,jorb
-    integer                                                 :: iexc,Nexc
-    integer                                                 :: ichan,Nchannel,istate,Nstates
-    integer                                                 :: i,is,js
-    complex(8)                                              :: weight,de
-    real(8)                                                 :: chan4
+  function get_Gimp_normal_array(zeta,axis) result(Gf)
+    complex(8),dimension(:),intent(in)                                 :: zeta
+    character(len=*),optional                                          :: axis
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Gf
+    complex(8),dimension(size(zeta))                                   :: green
+    integer                                                            :: ispin
+    integer                                                            :: ilat,jlat
+    integer                                                            :: iorb,jorb
+    integer                                                            :: iexc,Nexc
+    integer                                                            :: ichan,Nchannel,istate,Nstates
+    integer                                                            :: i,is,js
+    complex(8)                                                         :: weight,de
+    real(8)                                                            :: chan4
+    character(len=1)                                                   :: axis_
+    !
+    axis_ = 'm' ; if(present(axis))axis_ = axis(1:1) !only for self-consistency, not used here
     !
     if(.not.allocated(impGmatrix))stop "ed_gf_cluster ERROR: impGmatrix not allocated!"
     !
@@ -436,28 +431,19 @@ contains
              endif
           enddo
        enddo
-       Gf(1,1,ispin,ispin,iorb,jorb) = green
+       Gf(1,1,ispin,ispin,iorb,jorb,:) = green
     enddo
     !
     do ispin=1,Nspin
        do iorb=1,Nimp
           do jorb=1,Nimp
              if(iorb==jorb)cycle
-             gf(1,1,ispin,ispin,iorb,jorb) = 0.5d0*(gf(1,1,ispin,ispin,iorb,jorb) &
-                  - (one-chan4*xi)*gf(1,1,ispin,ispin,iorb,iorb) - (one-chan4*xi)*gf(1,1,ispin,ispin,jorb,jorb))  
+             gf(1,1,ispin,ispin,iorb,jorb,:) = 0.5d0*(gf(1,1,ispin,ispin,iorb,jorb,:) &
+                  - (one-chan4*xi)*gf(1,1,ispin,ispin,iorb,iorb,:) - (one-chan4*xi)*gf(1,1,ispin,ispin,jorb,jorb,:))  
           enddo
        enddo
     enddo
     !
-  end function get_Gimp_normal_scalar
-
-  function get_Gimp_normal_array(zeta) result(Gf)
-    complex(8),dimension(:),intent(in)                                 :: zeta
-    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Gf
-    integer                                                            :: i
-    do i=1,size(zeta)
-       Gf(:,:,:,:,:,:,i) = get_Gimp_normal_scalar(zeta(i))
-    enddo
   end function get_Gimp_normal_array
 
 
@@ -465,34 +451,32 @@ contains
 
 
 
-
-  function get_Sigma_normal_scalar(zeta) result(Sigma)
-    complex(8),intent(in)                                   :: zeta
-    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp) :: Sigma
-    complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp) :: invG0,invG
+  function get_Sigma_normal_array(zeta,axis) result(Sigma)
+    complex(8),dimension(:),intent(in)                                 :: zeta
+    character(len=*),optional                                          :: axis       !string indicating the desired axis, :code:`'m'` for Matsubara (default), :code:`'r'` for Real-axis
+    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Sigma,invG0,invG
+    complex(8),dimension(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)            :: iGzeta
+    character(len=4)                                                   :: axis_
     !
-    if(allocated(Sigma))deallocate(Sigma)
-    allocate(Sigma(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp)) ; Sigma=zero
+    axis_="mats";if(present(axis))axis_=str(axis)
+    !
+    ! if(allocated(Sigma))deallocate(Sigma)
+    ! allocate(Sigma(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp)) ; Sigma=zero
     !
     !Get G0^-1
-    invG0 = nnn2nso_reshape(invg0_bath(zeta))
+    invG0 = invg0_bath_function(zeta,dmft_bath,axis_)
     !
     !Get G^-1
-    invG  = nnn2nso_reshape(get_Gimp_normal(zeta))
-    call inv(invG)
+    invG  = get_Gimp_normal_array(zeta)
+    do i=1,size(zeta)
+       iGzeta  = nnn2nso_reshape( invG(:,:,:,:,:,:,i) ) !rank6->rank2
+       call inv(iGzeta)
+       invG(:,:,:,:,:,:,i) = nso2nnn_reshape(iGzeta) !rank2->rank6
+    enddo
     !
     !Get Sigma= G0^-1 - G^-1
-    Sigma = nso2nnn_reshape(invG0 - invG)
+    Sigma = invG0 - invG
     !
-  end subroutine get_Sigma_normal
-
-  function get_Sigma_normal_array(zeta) result(Sigma)
-    complex(8),dimension(:),intent(in)                                 :: zeta
-    complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,size(zeta)) :: Sigma
-    integer                                                            :: i
-    do i=1,size(zeta)
-       Sigma(:,:,:,:,:,:,i) = get_Sigma_normal_scalar(zeta(i))
-    enddo
   end function get_Sigma_normal_array
 
 

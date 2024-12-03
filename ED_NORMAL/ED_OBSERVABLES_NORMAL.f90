@@ -14,7 +14,6 @@ MODULE ED_OBSERVABLES_NORMAL
   USE ED_SECTOR
   USE ED_BATH
   USE ED_HAMILTONIAN_NORMAL
-  USE ED_IO
   implicit none
   private
 
@@ -52,13 +51,12 @@ MODULE ED_OBSERVABLES_NORMAL
   !
   integer                                 :: iorb,jorb,iorb1,jorb1
   integer                                 :: ispin,jspin
-  integer                                 :: ilat,jlat
   integer                                 :: ibath,jbath
-  integer                                 :: r,m,k,k1,k2
+  integer                                 :: r,m,k,k1,k2,k3,k4
   integer                                 :: iup,idw
   integer                                 :: jup,jdw
   integer                                 :: mup,mdw
-  real(8)                                 :: sgn,sgn1,sgn2,sg1,sg2
+  real(8)                                 :: sgn,sgn1,sgn2,sg1,sg2,sg3,sg4
   real(8)                                 :: gs_weight
   !
   real(8)                                 :: peso
@@ -83,7 +81,7 @@ contains
   !+-------------------------------------------------------------------+
   !PURPOSE  : Lanc method
   !+-------------------------------------------------------------------+
-  subroutine observables_normal()()
+  subroutine observables_normal()
     integer                             :: istate,Nud(2,Ns),iud(2),jud(2),is,js
     integer,dimension(2*Ns_Ud)          :: Indices
     integer,dimension(Ns_Ud,Ns_Orb)     :: Nups,Ndws  ![1,Ns]-[Norb,1+Nbath]
@@ -161,7 +159,7 @@ contains
              !
              !
           enddo
-          call delete_sector(isector,HI)
+          call delete_sector(sectorI)
        endif
        !
        if(allocated(state_cvec))deallocate(state_cvec)
@@ -193,7 +191,7 @@ contains
     endif
 #endif
     !
-    deallocate(dens,docc,dens_up,dens_dw,magz,sz2,n2,s2tot)
+    deallocate(dens,docc,dens_up,dens_dw,magz,sz2,n2)
   end subroutine observables_normal
 
 
@@ -244,7 +242,7 @@ contains
           do i=1,sectorI%Dim
              call state2indices(i,[iDimUps,iDimDws],Indices)
              mup = sectorI%H(1)%map(Indices(1))
-             mdw = sectorI%2(1)%map(Indices(2))
+             mdw = sectorI%H(2)%map(Indices(2))
              Nups(1,:) = Bdecomp(mup,Ns_Orb) ![Ns_Orb = Ns = Nlat*Norb*(Nbath+1) in CDMFT code]
              Ndws(1,:) = Bdecomp(mdw,Ns_Orb)
              Nup = Breorder(Nups) !Actually, they are already reordered in CDMFT code...
@@ -254,8 +252,8 @@ contains
              !
              !> H_Imp: Diagonal Elements, i.e. local part
              do iorb=1,Nimp
-                ed_Eknot = ed_Eknot + impHloc(1,1,1,1,iorb,iorb)*Nup(iorb)*gs_weight
-                ed_Eknot = ed_Eknot + impHloc(1,1,Nspin,Nspin,iorb,iorb)*Ndw(iorb)*gs_weight
+                ed_Eknot = ed_Eknot + impHloc(1,1,iorb,iorb)*Nup(iorb)*gs_weight
+                ed_Eknot = ed_Eknot + impHloc(Nspin,Nspin,iorb,iorb)*Ndw(iorb)*gs_weight
              enddo
              ! !> H_imp: Off-diagonal elements, i.e. non-local part. 
              iup = Indices(1)
@@ -266,7 +264,7 @@ contains
                 do jorb=1,Nimp
                    !UP
                    Jcondition = &
-                        (impHloc(1,1,1,1,iorb,jorb)/=0d0) .AND. &
+                        (impHloc(1,1,iorb,jorb)/=0d0) .AND. &
                         (Nup(jorb)==1) .AND. (Nup(iorb)==0)
                    if (Jcondition) then
                       call c(jorb,mup,k1,sg1)
@@ -275,12 +273,12 @@ contains
                       jdw = idw
                       j   = jup + (jdw-1)*iDimUp
                       ed_Eknot = ed_Eknot + &
-                           impHloc(1,1,1,1,iorb,jorb)*sg1*sg2*state_cvec(i)*conjg(state_cvec(j))*peso
+                           impHloc(1,1,iorb,jorb)*sg1*sg2*state_cvec(i)*conjg(state_cvec(j))*peso
                    endif
                    !
                    !DW
                    Jcondition = &
-                        (impHloc(1,1,Nspin,Nspin,iorb,jorb)/=0d0) .AND. &
+                        (impHloc(Nspin,Nspin,iorb,jorb)/=0d0) .AND. &
                         (ndw(jorb)==1) .AND. (ndw(iorb)==0)
                    if (Jcondition) then
                       call c(jorb,mdw,k1,sg1)
@@ -289,7 +287,7 @@ contains
                       jup = iup
                       j   = jup + (jdw-1)*iDimUp
                       ed_Eknot = ed_Eknot + &
-                           impHloc(1,1,Nspin,Nspin,iorb,jorb)*sg1*sg2*state_cvec(i)*conjg(state_cvec(j))*peso
+                           impHloc(Nspin,Nspin,iorb,jorb)*sg1*sg2*state_cvec(i)*conjg(state_cvec(j))*peso
                    endif
                 enddo
              enddo
@@ -313,8 +311,8 @@ contains
                          jup=binary_search(sectorI%H(1)%map,k4)
                          j = jup + (jdw-1)*sectorI%DimUp
                          !
-                         ed_Epot = ed_Epot + Jx*sg1*sg2*sg3*sg4*state_cvec(i)*state_cvec(j)*peso
-                         ed_Dse  = ed_Dse + sg1*sg2*sg3*sg4*state_cvec(i)*state_cvec(j)*peso
+                         ed_Epot = ed_Epot + Jx*sg1*sg2*sg3*sg4*state_cvec(i)*conjg(state_cvec(j))*peso
+                         ed_Dse  = ed_Dse + sg1*sg2*sg3*sg4*state_cvec(i)*conjg(state_cvec(j))*peso
                          !
                       endif
                    enddo
@@ -339,8 +337,8 @@ contains
                          jup = binary_search(sectorI%H(1)%map,k4)
                          j = jup + (jdw-1)*sectorI%DimUp
                          !
-                         ed_Epot = ed_Epot + Jp*sg1*sg2*sg3*sg4*state_dvec(i)*state_dvec(j)*peso
-                         ed_Dph = ed_Dph + sg1*sg2*sg3*sg4*state_dvec(i)*state_dvec(j)*peso
+                         ed_Epot = ed_Epot + Jp*sg1*sg2*sg3*sg4*state_cvec(i)*conjg(state_cvec(j))*peso
+                         ed_Dph = ed_Dph + sg1*sg2*sg3*sg4*state_cvec(i)*conjg(state_cvec(j))*peso
                          !
                       endif
                    enddo
@@ -383,12 +381,12 @@ contains
              !HARTREE-TERMS CONTRIBUTION:
              if(hfmode)then
                 !ed_Ehartree=ed_Ehartree - 0.5d0*dot_product(uloc,nup+ndw)*gs_weight + 0.25d0*sum(uloc)*gs_weight
-                do iorb=1,Nipm
+                do iorb=1,Nimp
                    ed_Ehartree=ed_Ehartree - 0.5d0*uloc(iorb)*(nup(iorb)+ndw(iorb))*gs_weight + 0.25d0*uloc(iorb)*gs_weight
                 enddo
                 if(Norb>1)then
                    do iorb=1,Nimp
-                      do jorb=iorb+1,Nipm
+                      do jorb=iorb+1,Nimp
                          ed_Ehartree=ed_Ehartree - 0.5d0*Ust*(nup(iorb)+ndw(iorb)+nup(jorb)+ndw(jorb))*gs_weight + 0.5d0*Ust*gs_weight
                          ed_Ehartree=ed_Ehartree - 0.5d0*(Ust-Jh)*(nup(iorb)+ndw(iorb)+nup(jorb)+ndw(jorb))*gs_weight + 0.5d0*(Ust-Jh)*gs_weight
                       enddo
@@ -396,7 +394,7 @@ contains
                 endif
              endif
           enddo
-          call delete_sector(isector,H)         
+          call delete_sector(sectorI)         
        endif
        !
        if(allocated(state_cvec))deallocate(state_cvec)
@@ -549,7 +547,7 @@ contains
              enddo
           enddo
           !
-          call delete_sector(isector,HI)       
+          call delete_sector(sectorI)       
        endif
        !
        if(allocated(state_cvec))deallocate(state_cvec)
@@ -628,7 +626,7 @@ contains
              !
              !
           enddo
-          call delete_sector(isector,HI)         
+          call delete_sector(sectorI)         
        endif
        !
        if(allocated(state_cvec))deallocate(state_cvec)
@@ -983,18 +981,18 @@ contains
   !+-------------------------------------------------------------------+
   subroutine write_observables()
     integer :: unit
-    integer :: iorb,jorb,ispin,ilat
+    integer :: iorb,jorb,ispin
     unit = free_unit()
-    open(unit,file="observables_all"//reg(ed_file_suffix)//"_site"//str(ilat,3)//".ed",position='append')
+    open(unit,file="observables_all"//reg(ed_file_suffix)//".ed",position='append')
     write(unit,"(90(F15.9,1X))")&
-         (dens(ilat,iorb),iorb=1,Nimp),&
-         (docc(ilat,iorb),iorb=1,Nimp),&
-         (dens_up(ilat,iorb),iorb=1,Nimp),&
-         (dens_dw(ilat,iorb),iorb=1,Nimp),&
-         (magz(ilat,iorb),iorb=1,Nimp),&
-         s2tot(ilat),egs,&
-         ((sz2(ilat,ilat,iorb,jorb),jorb=1,Nimp),iorb=1,Nimp),&
-         ((n2(ilat,ilat,iorb,jorb),jorb=1,Nimp),iorb=1,Nimp)
+         (dens(iorb),iorb=1,Nimp),&
+         (docc(iorb),iorb=1,Nimp),&
+         (dens_up(iorb),iorb=1,Nimp),&
+         (dens_dw(iorb),iorb=1,Nimp),&
+         (magz(iorb),iorb=1,Nimp),&
+         s2tot,egs,&
+         ((sz2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp),&
+         ((n2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp)
     close(unit)
     !
     unit = free_unit()
@@ -1003,16 +1001,16 @@ contains
     close(unit)
     !
     unit = free_unit()
-    open(unit,file="observables_last"//reg(ed_file_suffix)//"_site"//str(ilat,3)//".ed")
+    open(unit,file="observables_last"//reg(ed_file_suffix)//".ed")
     write(unit,"(90(F15.9,1X))")&
-         (dens(ilat,iorb),iorb=1,Nimp),&
-         (docc(ilat,iorb),iorb=1,Nimp),&
-         (dens_up(ilat,iorb),iorb=1,Nimp),&
-         (dens_dw(ilat,iorb),iorb=1,Nimp),&
-         (magz(ilat,iorb),iorb=1,Nimp),&
-         s2tot(ilat),egs,&
-         ((sz2(ilat,ilat,iorb,jorb),jorb=1,Nimp),iorb=1,Nimp),&
-         ((n2(ilat,ilat,iorb,jorb),jorb=1,Nimp),iorb=1,Nimp)
+         (dens(iorb),iorb=1,Nimp),&
+         (docc(iorb),iorb=1,Nimp),&
+         (dens_up(iorb),iorb=1,Nimp),&
+         (dens_dw(iorb),iorb=1,Nimp),&
+         (magz(iorb),iorb=1,Nimp),&
+         s2tot,egs,&
+         ((sz2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp),&
+         ((n2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp)
     close(unit)
 
     unit = free_unit()

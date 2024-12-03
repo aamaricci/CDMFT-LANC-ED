@@ -68,14 +68,14 @@ end subroutine ed_get_g0and_n4
 
 
 subroutine ed_get_g0and_n6(x,bath_,Self,axis)
-  complex(8),dimension(:),intent(in)                              :: x
-  real(8),dimension(:)                                            :: bath_
-  complex(8),dimension(:,:,:,:,:)                                 :: Self
-  character(len=*),optional                                       :: axis
+  complex(8),dimension(:),intent(in)  :: x
+  real(8),dimension(:)                :: bath_
+  complex(8),dimension(:,:,:,:,:,:,:) :: Self
+  character(len=*),optional           :: axis
   !
-  type(effective_bath)                                            :: dmft_bath_
-  logical                                                         :: check
-  character(len=1)                                                :: axis_
+  type(effective_bath)                :: dmft_bath_
+  logical                             :: check
+  character(len=1)                    :: axis_
   !
   axis_='m';if(present(axis))axis_=axis
   check= check_bath_dimension(bath_)
@@ -165,14 +165,14 @@ end subroutine ed_get_delta_n4
 
 
 subroutine ed_get_delta_n6(x,bath_,Self,axis)
-  complex(8),dimension(:),intent(in)                              :: x
-  real(8),dimension(:)                                            :: bath_
-  complex(8),dimension(:,:,:,:,:)                                 :: Self
-  character(len=*),optional                                       :: axis
+  complex(8),dimension(:),intent(in)  :: x
+  real(8),dimension(:)                :: bath_
+  complex(8),dimension(:,:,:,:,:,:,:) :: Self
+  character(len=*),optional           :: axis
   !
-  type(effective_bath)                                            :: dmft_bath_
-  logical                                                         :: check
-  character(len=1)                                                :: axis_
+  type(effective_bath)                :: dmft_bath_
+  logical                             :: check
+  character(len=1)                    :: axis_
   !
   axis_='m';if(present(axis))axis_=axis
   check= check_bath_dimension(bath_)
@@ -260,14 +260,14 @@ end subroutine ed_get_invG0_n4
 
 
 subroutine ed_get_invG0_n6(x,bath_,Self,axis)
-  complex(8),dimension(:),intent(in)                              :: x
-  real(8),dimension(:)                                            :: bath_
-  complex(8),dimension(:,:,:,:,:)                                 :: Self
-  character(len=*),optional                                       :: axis
+  complex(8),dimension(:),intent(in)  :: x
+  real(8),dimension(:)                :: bath_
+  complex(8),dimension(:,:,:,:,:,:,:) :: Self
+  character(len=*),optional           :: axis
   !
-  type(effective_bath)                                            :: dmft_bath_
-  logical                                                         :: check
-  character(len=1)                                                :: axis_
+  type(effective_bath)                :: dmft_bath_
+  logical                             :: check
+  character(len=1)                    :: axis_
   !
   axis_='m';if(present(axis))axis_=axis
   check= check_bath_dimension(bath_)

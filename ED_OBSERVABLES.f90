@@ -12,7 +12,7 @@ MODULE ED_OBSERVABLES
   USE ED_AUX_FUNX
   !
   USE ED_OBSERVABLES_NORMAL
-  USE ED_OBSERVABLES_SUPERC
+  ! USE ED_OBSERVABLES_SUPERC
   !
   implicit none
   private 
@@ -35,7 +35,7 @@ contains
     write(LOGfile,"(A)")"Get observables:"
     select case(ed_mode)
     case default  ;call observables_normal()
-    case("superc");call observables_superc()
+    ! case("superc");call observables_superc()
     end select
   end subroutine observables_impurity
 
@@ -51,7 +51,7 @@ contains
     write(LOGfile,"(A)")"Get local energy:"
     select case(ed_mode)
     case default  ;call local_energy_normal()
-    case("superc");call local_energy_superc()
+    ! case("superc");call local_energy_superc()
     end select
   end subroutine local_energy_impurity
 

@@ -36,6 +36,7 @@ MODULE ED_BATH_DMFT
   integer :: is,js
   integer :: io,jo
   integer :: i,j
+  integer :: in,jn
 
 contains
 
@@ -128,9 +129,9 @@ contains
     type(effective_bath)     :: dmft_bath_
     logical,optional         :: used
     real(8)                  :: re,im
-    integer                  :: isym,unit,Nh,Nsym
+    integer                  :: isym,unit,Nh,Nsym,flen
     integer,dimension(Nbath) :: Nlambdas
-    logical                  :: IOfile,,used_,mdiagonal_hsym,all_are_equal
+    logical                  :: IOfile,used_,diagonal_hsym,all_are_equal
     real(8)                  :: de
     real(8)                  :: rescale(Nbath),offset(Nbath)
     real(8),dimension(Nbath) :: one_lambdaval
@@ -163,7 +164,7 @@ contains
        one_lambdaval = Hbath_lambda(ibath,isym)
        all_are_equal = all(Hbath_lambda(:,isym)==one_lambdaval)
        !
-       if(diagonal_hsym.AND.all_lambdas_are_equal.AND.Nbath>1)then
+       if(diagonal_hsym.AND.all_are_equal.AND.Nbath>1)then
           !CDMFT:
           !> BACK-COMPATIBILITY PATCH: Nbath /degenerate/ lambdas, rescaled internally
           do ibath=1,Nbath
@@ -227,7 +228,7 @@ contains
     !
     type(effective_bath) :: dmft_bath_
     integer,optional     :: unit
-    integer              :: unit_
+    integer              :: unit_,isym
     complex(8)           :: Ho(Nambu*Nspin*Nimp,Nambu*Nspin*Nimp)
     character(len=64)    :: string_fmt,string_fmt_first
     !
@@ -235,7 +236,7 @@ contains
     if(.not.dmft_bath_%status)stop "write_dmft_bath error: bath not allocated"
     !
     string_fmt  ="("//str(Nspin*Nimp)//"(A1,F5.2,A1,F5.2,A1,2x))"
-
+    !
     select case(bath_type)
     case('replica')
        write(unit_,"(A1,90(A21,1X))")"#",&
@@ -261,7 +262,7 @@ contains
                (dmft_bath_%item(i)%lambda(io),io=1,dmft_bath_%Nbasis)
        end select
     enddo
-
+    !
     if(unit_/=LOGfile .AND. Nambu*Nspin*Nimp<10)then
        write(unit_,*)""
        do isym=1,size(Hbath_basis)
@@ -272,9 +273,9 @@ contains
              Ho(i,j) = Hbath_basis(isym)%O(in,jn,ispin,jspin,iorb,jorb)
           enddo
           !
-          do i=1,Nnambu*Nspin*Nimp
+          do i=1,Nambu*Nspin*Nimp
              write(unit_,string_fmt)&
-                  ('(',dreal(Ho(i,j)),',',dimag(Ho(i,j)),')',j =1,Nnambu*Nspin*Nimp)
+                  ('(',dreal(Ho(i,j)),',',dimag(Ho(i,j)),')',j =1,Nambu*Nspin*Nimp)
           enddo
           write(unit_,*)""
        enddo

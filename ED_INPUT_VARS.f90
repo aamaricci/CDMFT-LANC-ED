@@ -2,10 +2,9 @@ MODULE ED_INPUT_VARS
   USE SF_VERSION
   USE SF_PARSE_INPUT
   USE SF_IOTOOLS, only:str,free_unit
+  USE ED_VERSION
+  use iso_c_binding
   implicit none
-
-  !GIT VERSION
-  include "revision.inc"  !this file is generated at compilation time in the Makefile
 
 
   !input variables
@@ -43,7 +42,6 @@ MODULE ED_INPUT_VARS
   real(8)                                          :: cutoff              !cutoff for spectral summation
   real(8)                                          :: gs_threshold        !Energy threshold for ground state degeneracy loop up
   real(8)                                          :: deltasc             !breaking symmetry field
-  real(8)                                          :: dmft_error          !dmft convergence threshold
 
   character(len=7)                                 :: ed_mode             !flag to set ed symmetry type: normal=normal (default), superc=superconductive, nonsu2=broken SU(2)
   logical                                          :: ed_finite_temp      !flag to select finite temperature method. note that if T then lanc_nstates_total must be > 1 
@@ -162,7 +160,8 @@ contains
     !
 
     call parse_input_variable(ed_mode,"ED_MODE",INPUTunit,default='normal',comment="Flag to set ED type: normal=normal, superc=superconductive, nonsu2=broken SU(2)")
-    call parse_input_variable(ed_twin,"ED_TWIN",INPUTunit,default=.false.,comment="flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.")
+    call parse_input_variable(ed_twin_,"ED_TWIN",INPUTunit,default=.false.,comment="flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.")
+    ed_twin = ed_twin_
     call parse_input_variable(ed_sectors,"ED_SECTORS",INPUTunit,default=.false.,comment="flag to reduce sector scan for the spectrum to specific sectors +/- ed_sectors_shift.")
     call parse_input_variable(ed_sectors_shift,"ED_SECTORS_SHIFT",INPUTunit,1,comment="shift to ed_sectors")
     call parse_input_variable(ed_sparse_H,"ED_SPARSE_H",INPUTunit,default=.true.,comment="flag to select  storage of sparse matrix H (mem--, cpu++) if TRUE, or direct on-the-fly H*v product (mem++, cpu--) if FALSE ")
@@ -171,8 +170,8 @@ contains
     call parse_input_variable(ed_print_G,"ED_PRINT_G",INPUTunit,default=.true.,comment="flag to print impurity Greens function")
     call parse_input_variable(ed_print_G0,"ED_PRINT_G0",INPUTunit,default=.true.,comment="flag to print non-interacting impurity Greens function")
     call parse_input_variable(ed_verbose,"ED_VERBOSE",INPUTunit,default=3,comment="Verbosity level: 0=almost nothing --> 5:all. Really: all")
-    call parse_input_variable(ed_hw_bath,"ed_hw_bath",INPUTunit,default=2d0,comment="half-bandwidth for the bath initialization: flat in -ed_hw_bath:ed_hw_bath")
-    call parse_input_variable(ed_offset_bath,"ed_offset_bath",INPUTunit,default=1d-1,comment="offset for the initialization of diagonal terms in replica/general bath: -offset:offset")
+    call parse_input_variable(ed_hw_band,"ED_HW_BAND",INPUTunit,default=2d0,comment="half-bandwidth for the bath initialization: flat in -ed_hw_bath:ed_hw_bath")
+    call parse_input_variable(ed_offset_bath,"ED_OFFSET_BATH",INPUTunit,default=1d-1,comment="offset for the initialization of diagonal terms in replica/general bath: -offset:offset")
 
     call parse_input_variable(nsuccess,"NSUCCESS",INPUTunit,default=1,comment="Number of successive iterations below threshold for convergence")
     call parse_input_variable(Lmats,"LMATS",INPUTunit,default=5000,comment="Number of Matsubara frequencies.")
@@ -239,7 +238,7 @@ contains
        call print_input()
        call save_input(INPUTunit)
        call scifor_version()
-       call code_version(revision)
+       call code_version(version)
     endif
     !
     if(nread .ne. 0d0) then

@@ -5,10 +5,10 @@
      iup = iup_index(i+mpiIshift,DimUp)
      idw = idw_index(i+mpiIshift,DimUp)
      !
-     mup = Hs(1)%map(iup)
-     mdw = Hs(2)%map(idw)
+     mup = Hsector%H(1)%map(iup)
+     mdw = Hsector%H(2)%map(idw)
      !
-     Nuo = bdecomp(mup,Ns)
+     Nup = bdecomp(mup,Ns)
      Ndw = bdecomp(mdw,Ns)
      !
      ! SPIN-EXCHANGE (S-E) and PAIR-HOPPING TERMS
@@ -26,10 +26,10 @@
               if(Jcondition)then
                  call c(iorb,mdw,k1,sg1)  !DW
                  call cdg(jorb,k1,k2,sg2) !DW
-                 jdw=binary_search(Hs(2)%map,k2)
+                 jdw=binary_search(Hsector%H(2)%map,k2)
                  call c(jorb,mup,k3,sg3)  !UP
                  call cdg(iorb,k3,k4,sg4) !UP
-                 jup=binary_search(Hs(1)%map,k4)
+                 jup=binary_search(Hsector%H(1)%map,k4)
                  htmp = Jx*sg1*sg2*sg3*sg4
                  j = jup + (jdw-1)*dimup
                  !
@@ -54,10 +54,10 @@
               if(Jcondition)then
                  call c(jorb,mdw,k1,sg1)       !c_jorb_dw
                  call cdg(iorb,k1,k2,sg2)      !c^+_iorb_dw
-                 jdw = binary_search(Hs(2)%map,k2)
+                 jdw = binary_search(Hsector%H(2)%map,k2)
                  call c(jorb,mup,k3,sg3)       !c_jorb_up
                  call cdg(iorb,k3,k4,sg4)      !c^+_iorb_up
-                 jup = binary_search(Hs(1)%map,k4)
+                 jup = binary_search(Hsector%H(1)%map,k4)
                  htmp = Jp*sg1*sg2*sg3*sg4
                  j = jup + (jdw-1)*dimup
                  !

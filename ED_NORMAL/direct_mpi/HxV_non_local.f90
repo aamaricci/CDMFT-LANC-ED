@@ -5,8 +5,8 @@
      iup = iup_index(i+mpiIshift,DimUp)
      idw = idw_index(i+mpiIshift,DimUp)
      !
-     mup = Hs(1)%map(iup)
-     mdw = Hs(2)%map(idw)
+     mup = Hsector%H(1)%map(iup)
+     mdw = Hsector%H(2)%map(idw)
      !
      nup = bdecomp(mup,Ns)
      ndw = bdecomp(mdw,Ns)
