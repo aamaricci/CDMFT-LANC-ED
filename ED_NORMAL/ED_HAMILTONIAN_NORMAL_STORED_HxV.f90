@@ -87,20 +87,16 @@ contains
     !
     !-----------------------------------------------!
     !LOCAL HAMILTONIAN TERMS
-    print*,"entering Hlocal"
     include "stored/H_local.f90"
     !
     !UP TERMS
-    print*,"entering Hup"
     include "stored/H_up.f90"
     !
     !DW TERMS
-    print*,"entering Hdw"
     include "stored/H_dw.f90"
     !
     !NON-LOCAL HAMILTONIAN TERMS
     if(jhflag)then
-       print*,"entering H_non_local"
        include "stored/H_non_local.f90"
     endif
     !

@@ -8,7 +8,6 @@
      Nup = bdecomp(mup,Ns)
      Ndw = bdecomp(mdw,Ns)
      !
-     !
      !> H_Imp: Diagonal Elements, i.e. local part
      htmp = zero
      do iorb=1,Nimp
@@ -28,8 +27,11 @@
      !
      !density-density interaction: same orbital, opposite spins:
      ! = \sum_\a U_\a*(n_{\a,up}*n_{\a,dw})
-     do iorb=1,Nimp
-        htmp = htmp + Uloc(iorb)*nup(iorb)*ndw(iorb)
+     do ilat=1,Nlat
+        do iorb=1,Norb
+           io = iorb + (ilat-1)*Norb
+           htmp = htmp + Uloc(iorb)*nup(io)*ndw(io)
+        enddo
      enddo
      if(Norb>1)then
         !density-density interaction: different orbitals, opposite spins:
@@ -52,8 +54,10 @@
      !if using the Hartree-shifted chemical potential: mu=0 for half-filling
      !sum up the contributions of hartree terms:
      if(hfmode)then
-        do iorb=1,Nimp
-           htmp = htmp - 0.5d0*Uloc(iorb)*(nup(iorb)+ndw(iorb)) !+ 0.25d0*Uloc(iorb)
+        do ilat=1,Nlat
+           do iorb=1,Norb
+              htmp = htmp - 0.5d0*Uloc(iorb)*(nup(io)+ndw(io)) !+ 0.25d0*Uloc(iorb)
+           enddo
         enddo
         if(Norb>1)then
            do iorb=1,Nimp
@@ -68,7 +72,7 @@
      !
      !> H_Bath: local bath energy contribution.
      !diagonal bath hamiltonian: +energy of the bath=\sum_a=1,Norb\sum_{l=1,Nbath}\e^a_l n^a_l
-     do iorb=1,size(bath_diag,2)
+     do iorb=1,Nimp
         do ibath=1,Nbath
            ialfa = getBathStride(iorb,ibath)
            htmp = htmp + bath_diag(1    ,iorb,ibath)*Nup(ialfa) !UP

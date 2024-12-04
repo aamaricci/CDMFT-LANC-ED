@@ -140,31 +140,29 @@ contains
           call map_allocate(self%H,[self%DimUp,self%DimDw])
        endif
        !
-       do iud=1,Ns_Ud
-          !UP    
-          imap=0
-          do iup=0,2**Ns_Orb-1
-             nup_ = popcnt(iup)  
-             if(nup_ /= Nups(iud))cycle
-             imap  = imap+1
-             self%H(iud)%map(imap) = iup
-             if(.not.itrace_)cycle
-             iIMP  = ibits(iup,0,Nimp)
-             iBATH = ibits(iup,Nimp,Nimp*Nbath)
-             call sp_insert_state(self%H(iud)%sp,iIMP,iBATH,imap) 
-          enddo
-          !DW
-          imap=0
-          do idw=0,2**Ns_Orb-1
-             ndw_= popcnt(idw)
-             if(ndw_ /= Ndws(iud))cycle
-             imap = imap+1
-             self%H(iud+Ns_Ud)%map(imap) = idw
-             if(.not.itrace_)cycle
-             iIMP  = ibits(idw,0,Nimp)
-             iBATH = ibits(idw,Nimp,Nimp*Nbath)
-             call sp_insert_state(self%H(iud+Ns_Ud)%sp,iIMP,iBATH,imap) 
-          enddo
+       !UP    
+       imap=0
+       do iup=0,2**Ns_Orb-1
+          nup_ = popcnt(iup)  
+          if(nup_ /= self%Nup)cycle
+          imap  = imap+1
+          self%H(1)%map(imap) = iup
+          if(.not.itrace_)cycle
+          iIMP  = ibits(iup,0,Nimp)
+          iBATH = ibits(iup,Nimp,Nimp*Nbath)
+          call sp_insert_state(self%H(1)%sp,iIMP,iBATH,imap) 
+       enddo
+       !DW
+       imap=0
+       do idw=0,2**Ns_Orb-1
+          ndw_= popcnt(idw)
+          if(ndw_ /= self%Ndw)cycle
+          imap = imap+1
+          self%H(2)%map(imap) = idw
+          if(.not.itrace_)cycle
+          iIMP  = ibits(idw,0,Nimp)
+          iBATH = ibits(idw,Nimp,Nimp*Nbath)
+          call sp_insert_state(self%H(2)%sp,iIMP,iBATH,imap) 
        enddo
        !       
     case ("superc")
@@ -196,6 +194,7 @@ contains
 
     end select
     !
+    self%Nlanc = min(self%Dim,lanc_nGFiter)
     self%status=.true.
     !
   end subroutine build_sector

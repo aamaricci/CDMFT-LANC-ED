@@ -25,15 +25,13 @@ contains
     complex(8),dimension(:,:,:,:,:)    :: fg ![Nspin][Nspin][Nimp][Nimp][Lmats]
     real(8),dimension(:),intent(inout) :: bath_
     real(8),dimension(:),allocatable   :: array_bath
-    integer                            :: iter,stride,counter,Asize
+    integer                            :: iter,Asize
     real(8)                            :: chi
     logical                            :: check
     character(len=256)                 :: suffix
     integer                            :: unit
     !
     call assert_shape(fg,[Nspin,Nspin,Nimp,Nimp,size(fg,5)],"chi2_fitgf_replica_normal_n4","fg")
-    !
-    !allocate(Nlambdas(Nbath))
     !
     check= check_bath_dimension(bath_)
     if(.not.check)stop "chi2_fitgf_replica_normal error: wrong bath dimensions"
@@ -44,8 +42,8 @@ contains
        print *, "         be aware that CG_POW is not doing what you would expect for a chi^q"
     endif
     !
-    call allocate_dmft_bath(dmft_bath)
-    call set_dmft_bath(bath_,dmft_bath)
+    call allocate_dmft_bath(dmft_bath_fit)
+    call set_dmft_bath(bath_,dmft_bath_fit)
     allocate(array_bath(size(bath_)-1))
     Nlambdas   = nint(bath_(1))
     array_bath = bath_(2:)
@@ -89,7 +87,7 @@ contains
     !
     FGmatrix = fg
     !
-    !
+    
     select case(cg_method)     !0=NR-CG[default]; 1=CG-MINIMIZE
     case default
        if(cg_grad==0)then
@@ -173,9 +171,8 @@ contains
        case default
           stop "chi2_fitgf_replica_normal error: cg_scheme != [weiss,delta]"
        end select
-       !
     end select
-    !
+    
     write(LOGfile,"(A,ES18.9,A,I5,A)")"chi^2|iter"//reg(ed_file_suffix)//'= ',chi," | ",iter,"  <--  All Orbs, All Spins"
     !
     suffix="_ALLorb_ALLspins"//reg(ed_file_suffix)
@@ -184,29 +181,28 @@ contains
     write(unit,"(ES18.9,1x,I5)") chi,iter
     close(unit)
     !
-    bath_(Nbath+1:size(bath_))=array_bath
-    call set_dmft_bath(bath_,dmft_bath) ! *** array_bath --> dmft_bath *** (per write fit result)
-    call write_dmft_bath(dmft_bath,LOGfile)
-    call save_dmft_bath(dmft_bath)
+    bath_(2:) = array_bath
+    call set_dmft_bath(bath_,dmft_bath_fit) ! *** array_bath --> dmft_bath *** (per write fit result)
+    call write_dmft_bath(dmft_bath_fit,LOGfile)
+    call save_dmft_bath(dmft_bath_fit)
     !
     call write_fit_result()
     !
-    call get_dmft_bath(dmft_bath,bath_)                ! ***  dmft_bath --> bath_ ***    (bath in output)
-    call deallocate_dmft_bath(dmft_bath)
+    call get_dmft_bath(dmft_bath_fit,bath_)                ! ***  dmft_bath --> bath_ ***    (bath in output)
+    call deallocate_dmft_bath(dmft_bath_fit)
     deallocate(FGmatrix,Hmask,Xdelta,Wdelta)
     deallocate(array_bath)
-    !deallocate(Nlambdas)
     !
   contains
     !
     subroutine write_fit_result()
-      complex(8)        :: fgand(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Ldelta)
-      real(8)           :: w
+      real(8)    :: w
+      complex(8) :: fgand(Nspin,Nspin,Nimp,Nimp,Ldelta)
       if(cg_scheme=='weiss')then
-         fgand = g0and_bath_function(xi*Xdelta,dmft_bath)
+         fgand = g0and_replica_normal(array_bath)
       else
-         fgand = delta_bath_function(xi*Xdelta,dmft_bath)
-      endif
+         fgand = delta_replica_normal(array_bath)
+      endif      
       !
       do ispin=1,Nspin
          do jspin=1,Nspin
@@ -225,8 +221,8 @@ contains
                   do i=1,Ldelta
                      w = Xdelta(i)
                      write(unit,"(5F24.15)")Xdelta(i),&
-                          dimag(fg(ispin,jspin,iorb,jorb,i)),dimag(fgand(1,1,ispin,jspin,iorb,jorb,i)),&
-                          dreal(fg(ispin,jspin,iorb,jorb,i)),dreal(fgand(1,1,ispin,jspin,iorb,jorb,i))
+                          dimag(fg(ispin,jspin,iorb,jorb,i)),dimag(fgand(ispin,jspin,iorb,jorb,i)),&
+                          dreal(fg(ispin,jspin,iorb,jorb,i)),dreal(fgand(ispin,jspin,iorb,jorb,i))
                   enddo
                   close(unit)
                enddo
@@ -248,7 +244,7 @@ contains
     complex(8),dimension(:,:,:,:,:)    :: ff ![Nspin,Nspin,Nimp,Nimp][Lmats]
     real(8),dimension(:),intent(inout) :: bath_
     real(8),dimension(:),allocatable   :: array_bath
-    integer                            :: iter,stride,counter,Asize
+    integer                            :: iter,Asize
     real(8)                            :: chi
     logical                            :: check
     character(len=256)                 :: suffix
@@ -256,8 +252,6 @@ contains
     !
     call assert_shape(fg,[Nspin,Nspin,Nimp,Nimp,size(fg,5)],"chi2_fitgf_replica_superc_n4","fg")
     call assert_shape(ff,[Nspin,Nspin,Nimp,Nimp,size(fg,5)],"chi2_fitgf_replica_superc_n4","ff")
-    !
-    !allocate(Nlambdas(Nbath))
     !
     check= check_bath_dimension(bath_)
     if(.not.check)stop "chi2_fitgf_replica_superc error: wrong bath dimensions"
@@ -268,15 +262,8 @@ contains
        print *, "         be aware that CG_POW is not doing what you would expect for a chi^q"
     endif
     !
-    call allocate_dmft_bath(dmft_bath)
-    call set_dmft_bath(bath_,dmft_bath)
-    ! allocate(array_bath(size(bath_)-Nbath))
-    ! counter=0
-    ! do ibath=1,Nbath
-    !    counter=counter+1
-    !    Nlambdas(ibath)=NINT(bath_(counter))
-    ! enddo
-    ! array_bath=bath_(Nbath+1:size(bath_))
+    call allocate_dmft_bath(dmft_bath_fit)
+    call set_dmft_bath(bath_,dmft_bath_fit)
     allocate(array_bath(size(bath_)-1))
     Nlambdas  =nint(bath_(1))
     array_bath=bath_(2:)
@@ -392,57 +379,60 @@ contains
     write(unit,"(ES18.9,1x,I5)") chi,iter
     close(unit)
     !
-    bath_(Nbath+1:size(bath_))=array_bath
-    call set_dmft_bath(bath_,dmft_bath) ! *** array_bath --> dmft_bath *** (per write fit result)
-    call write_dmft_bath(dmft_bath,LOGfile)
-    call save_dmft_bath(dmft_bath)
+    bath_(2:) = array_bath
+    call set_dmft_bath(bath_,dmft_bath_fit) ! *** array_bath --> dmft_bath *** (per write fit result)
+    call write_dmft_bath(dmft_bath_fit,LOGfile)
+    call save_dmft_bath(dmft_bath_fit)
     !
     call write_fit_result()
     !
-    call get_dmft_bath(dmft_bath,bath_)                ! ***  dmft_bath --> bath_ ***    (bath in output)
-    call deallocate_dmft_bath(dmft_bath)
+    call get_dmft_bath(dmft_bath_fit,bath_)                ! ***  dmft_bath --> bath_ ***    (bath in output)
+    call deallocate_dmft_bath(dmft_bath_fit)
     deallocate(FGmatrix,FFmatrix,Hmask,Xdelta,Wdelta)
     deallocate(array_bath)
-    ! deallocate(Nlambdas)
     !
   contains
     !
     subroutine write_fit_result()
-      complex(8)                       :: fgand(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Ldelta)
-      real(8)                          :: w
+      complex(8) :: fgand(2,Nspin,Nspin,Nimp,Nimp,Ldelta)
+      integer    :: gunit,funit
       if(cg_scheme=='weiss')then
-         fgand = g0and_bath_function(xi*Xdelta,dmft_bath)
+         fgand = g0and_replica_superc(array_bath)
       else
-         fgand = delta_bath_function(xi*Xdelta,dmft_bath)
+         fgand = delta_replica_superc(array_bath)
       endif
       !
       do ispin=1,Nspin
          do jspin=1,Nspin
             do iorb=1,Nimp
                do jorb=1,Nimp
-                  suffix="_l"//reg(str(iorb))//&
-                       "_m"//reg(str(jorb))//&
-                       "_s"//reg(str(ispin))//&
-                       "_r"//reg(str(jspin))//reg(ed_file_suffix)
-                  unit=free_unit()
+                  suffix="_l"//str(iorb)//&
+                       "_m"//str(jorb)//&
+                       "_s"//str(ispin)//&
+                       "_r"//str(jspin)//reg(ed_file_suffix)
+                  gunit=free_unit()
+                  funit=free_unit()
                   if(cg_scheme=='weiss')then
-                     open(unit,file="fit_weiss"//reg(suffix)//".ed")
+                     open(gunit,file="fit_weiss"//reg(suffix)//".ed")
+                     open(funit,file="fit_fweiss"//reg(suffix)//".ed")
                   else
-                     open(unit,file="fit_delta"//reg(suffix)//".ed")
+                     open(gunit,file="fit_delta"//reg(suffix)//".ed")
+                     open(funit,file="fit_tdelta"//reg(suffix)//".ed")
                   endif
                   do i=1,Ldelta
-                     w = Xdelta(i)
-                     write(unit,"(9F24.15)")Xdelta(i),&
+                     write(gunit,"(9F24.15)")Xdelta(i),&
                           dimag(fg(ispin,jspin,iorb,jorb,i)),&
-                          dimag(fgand(1,1,ispin,jspin,iorb,jorb,i)),&
+                          dimag(fgand(1,ispin,jspin,iorb,jorb,i)),&
                           dreal(fg(ispin,jspin,iorb,jorb,i)),&
-                          dreal(fgand(1,1,ispin,jspin,iorb,jorb,i)),&
+                          dreal(fgand(1,ispin,jspin,iorb,jorb,i))
+                     write(funit,"(9F24.15)")Xdelta(i),&
                           dimag(ff(ispin,jspin,iorb,jorb,i)),&
-                          dimag(fgand(1,2,ispin,jspin,iorb,jorb,i)),&
+                          dimag(fgand(2,ispin,jspin,iorb,jorb,i)),&
                           dreal(ff(ispin,jspin,iorb,jorb,i)),&
-                          dreal(fgand(1,2,ispin,jspin,iorb,jorb,i))
+                          dreal(fgand(2,ispin,jspin,iorb,jorb,i))
                   enddo
-                  close(unit)
+                  close(gunit)
+                  close(funit)
                enddo
             enddo
          enddo

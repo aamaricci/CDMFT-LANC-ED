@@ -23,8 +23,8 @@ MODULE ED_HAMILTONIAN_NORMAL_COMMON
   integer                                   :: iud,jj
   integer                                   :: ishift
   integer                                   :: isector,jsector
-  integer                                   :: i,iup,idw
-  integer                                   :: j,jup,jdw
+  integer                                   :: i,iup,idw,io
+  integer                                   :: j,jup,jdw,jo
   integer                                   :: iph,i_el,j_el
   integer                                   :: m,mup,mdw
   integer                                   :: ms

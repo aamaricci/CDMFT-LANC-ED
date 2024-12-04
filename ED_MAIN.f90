@@ -157,17 +157,16 @@ contains
     !
     !
     !SOLVE THE QUANTUM IMPURITY PROBLEM:
-    call diagonalize_impurity()                   !find target states by digonalization of Hamiltonian
-    if(iflag)call buildgf_impurity()            !build the one-particle impurity Green's functions & Self-energy
-    ! if(iflag)call get_custom_observables()      !obtain custom user-defined observables (if initialized)
-    !if(iflag)call buildchi_impurity()         !build the local susceptibilities (todo)
-    call observables_impurity()                   !obtain impurity observables as thermal averages.
-    call local_energy_impurity()                  !obtain the local energy of the effective impurity problem
+    call diagonalize_impurity()                  !find target states by digonalization of Hamiltonian
+    if(iflag)call buildgf_impurity()             !build the one-particle impurity Green's functions & Self-energy
+    ! if(iflag)call get_custom_observables()     !obtain custom user-defined observables (if initialized)
+    !if(iflag)call buildchi_impurity()           !build the local susceptibilities (todo)
+    call observables_impurity()                  !obtain impurity observables as thermal averages.
+    call local_energy_impurity()                 !obtain the local energy of the effective impurity problem
     !
     !OPTIONAL (HEAVY) CALCULATIONS 
     if(dm_flag) call density_matrix_impurity()    !build the cluster density matrix (\rho_IMP = Tr_BATH(\rho))
     !
-    call deallocate_dmft_bath(dmft_bath)
     call es_delete_espace(state_list)
     !
     !DELETE THE LOCAL MPI COMMUNICATOR:

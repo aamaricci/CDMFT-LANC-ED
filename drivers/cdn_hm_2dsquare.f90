@@ -31,21 +31,18 @@ program cdn_hm_2dsquare
   !SYMMETRY BASIS for BATH:
   real(8),dimension(:,:),allocatable          :: lambdasym_vectors
   complex(8),dimension(:,:,:),allocatable     :: Hsym_basis
-
-
   character(len=64)                           :: finput,foutput
-
   !MPI VARIABLES (local use -> ED code has its own set of MPI variables)
   integer                                     :: comm
   integer                                     :: rank
   integer                                     :: mpi_size
   logical                                     :: master
-
+  !
   !Init MPI: use of MPI overloaded functions in SciFor
   call init_MPI(comm,.true.)
   rank   = get_Rank_MPI(comm)
   master = get_Master_MPI(comm)
-
+  !  
   !Parse input variables
   call parse_cmd_variable(finput,"FINPUT",default='inputHM2D.conf')
   call parse_input_variable(wmixing,"wmixing",finput,default=1.d0,comment="Mixing bath parameter")
@@ -109,7 +106,7 @@ program cdn_hm_2dsquare
      onsite = irepl - 1 - (Nbath-1)/2d0        ![-(Nbath-1)/2:(Nbath-1)/2]
      onsite = onsite * 2*ed_hw_band/(Nbath-1)  !P-H symmetric band, -HWBAND:HWBAND
      lambdasym_vectors(irepl,1) = onsite       !Multiplies the suitable identity
-     lambdasym_vectors(irepl,2) = 1d0          !Recall that TS is contained in Hloc
+     lambdasym_vectors(irepl,2) = 1d0+noise(0.1d0)           !Recall that TS is contained in Hloc
   enddo
   if(mod(Nbath,2)==0)then
      lambdasym_vectors(Nbath/2,1)   = -1d-1    !Much needed small energies around
@@ -125,8 +122,6 @@ program cdn_hm_2dsquare
   !SETUP BATH
   call ed_set_Hbath(Hsym_basis,lambdasym_vectors)
   Nb=ed_get_bath_dimension(Nsym)
-
-  print*,"driver:",Nb
 
   !SETUP SOLVER
   allocate(bath(Nb))
@@ -240,12 +235,23 @@ program cdn_hm_2dsquare
   !Compute the Kinetic Energy:
   call dmft_kinetic_energy(Hk(:,:,:),nn2so_f(Smats,Lmats))
 
+
+  call ed_finalize_solver()
   call finalize_MPI()
 
 
 contains
 
 
+  function noise(W) result(r)
+    real(8) :: W
+    real(8) :: r
+    r = mersenne()
+    r = 2d0*r-1d0
+    r = r*W
+  end function noise
+
+  
   !-------------------------------------------------------------------------------------------
   !PURPOSE:  Hk model for the 2d square lattice
   !-------------------------------------------------------------------------------------------

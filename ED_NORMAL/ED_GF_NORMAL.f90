@@ -37,8 +37,6 @@ MODULE ED_GF_NORMAL
   integer                               :: jdim,jdimUP,jdimDW
   complex(8),allocatable                :: vvinit(:)
   real(8),allocatable                   :: alfa_(:),beta_(:)
-  integer                               :: ialfa,ibeta
-  integer                               :: jalfa,jbeta
   integer                               :: r,m
   real(8)                               :: sgn,norm2,norm0
   integer                               :: Nitermax,Nlanc,vecDim
@@ -82,7 +80,6 @@ contains
     !
     integer :: counter
     real(8) :: chan4
-
     !
     if(ed_gf_symmetric)then
        chan4=0.d0
@@ -95,7 +92,6 @@ contains
     !
     ! 
     max_exc =-huge(1d0)          !find the max excitation
-
     !
     if(MpiMaster)call start_timer
     !
@@ -298,7 +294,7 @@ contains
        !
        !
        !EVALUATE (c_is - i*c_js)|gs>
-       jsector = getCsector(ialfa,ispin,isector)
+       jsector = getCsector(1,ispin,isector)
        if(jsector/=0)then
           !
           vvinit =  apply_Cops(v_state,[one,-xi],[-1,-1],[iorb,jorb],[ispin,ispin],jsector,sectorI)
@@ -368,7 +364,6 @@ contains
     subdiag(2:Nlanc) = Bs(2:Nlanc)
     !
     call eigh(diag(1:Nlanc),subdiag(2:Nlanc),Ev=Z(:Nlanc,:Nlanc))
-
     !
     call allocate_GFmatrix(Self,istate=istate,ichan=ichan,Nexc=Nlanc)
     !
@@ -415,6 +410,8 @@ contains
     !
     chan4=1d0 ; if(ed_gf_symmetric)chan4=0d0
     !
+    in = 1
+    jn = 1
     do concurrent(ispin=1:Nspin,iorb=1:Nimp,jorb=1:Nimp)
        green   = zero
        Nstates = size(impGmatrix(in,jn,ispin,ispin,iorb,jorb)%state)
@@ -459,9 +456,6 @@ contains
     character(len=4)                                                   :: axis_
     !
     axis_="mats";if(present(axis))axis_=str(axis)
-    !
-    ! if(allocated(Sigma))deallocate(Sigma)
-    ! allocate(Sigma(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp)) ; Sigma=zero
     !
     !Get G0^-1
     invG0 = invg0_bath_function(zeta,dmft_bath,axis_)

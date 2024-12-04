@@ -36,23 +36,15 @@ MODULE ED_FIT_COMMON
   logical                                     :: para_
   
   !location of the maximum of the chisquare over Nlso.
-  integer                                       :: maxchi_loc
-
+  integer                                     :: maxchi_loc
 
   !This contains the number of the lambda expansion
   !for each replica of the impurity. which are notable the same number so far.
-  integer                                       :: Nlambdas
-  ! integer                                     :: Nlambdas
-  !
-  ! THIS IS NOT NEEDED ANYMORE I GUESS, BECAUSE NLAMBDAS is FIXED NOW
-  ! WE CAN ALLOCATE A RANK-2 ARRAY *dummy_lambda(Nbath,Nlambdas)*
-  !
-  ! !This is a dummy object which is used here to point
-  ! !to the replica bath lambdas, i.e. the coefficients
-  ! !of the bath item-th Hamiltonian expansion 
-  ! type nsymm_vector
-  !    real(8),dimension(:),allocatable         :: element          
-  ! end type nsymm_vector
+  integer                                     :: Nlambdas
 
+  !This is an internal istance of the effective bath to avoid
+  !overwriting the allocated internally, which is used to retrieve
+  !Gimp and Sigma on the fly
+  type(effective_bath)                        :: dmft_bath_fit
 
 END MODULE ED_FIT_COMMON

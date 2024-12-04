@@ -108,17 +108,7 @@ contains
     do istate=1,state_list%size
        isector = es_return_sector(state_list,istate)
        Ei      = es_return_energy(state_list,istate)
-       !
-#ifdef _MPI
-       if(MpiStatus)then
-          call es_return_cvector(MpiComm,state_list,istate,state_cvec)
-       else
-          call es_return_cvector(state_list,istate,state_cvec)
-       endif
-#else
-       call es_return_cvector(state_list,istate,state_cvec)
-#endif
-       !
+       state_cvec  =  es_return_vector(state_list,istate)
        !
        peso = 1.d0 ; if(finiteT)peso=exp(-beta*(Ei-Egs))
        peso = peso/zeta_function
@@ -129,7 +119,7 @@ contains
              !
              gs_weight=peso*abs(state_cvec(i))**2
              !
-             call state2indices(i,[iDimUps,iDimDws],Indices)
+             call state2indices(i,[sectorI%DimUps,sectorI%DimDws],Indices)
              mup  = sectorI%H(1)%map(Indices(1))
              mdw  = sectorI%H(2)%map(Indices(2))
              IbUp = Bdecomp(mup,Ns_Orb) ![Ns_Orb = Ns = Nlat*Norb*(Nbath+1) in CDMFT code]
@@ -240,7 +230,7 @@ contains
        if(MpiMaster)then
           call build_sector(isector,sectorI)
           do i=1,sectorI%Dim
-             call state2indices(i,[iDimUps,iDimDws],Indices)
+             call state2indices(i,[sectorI%DimUps,sectorI%DimDws],Indices)
              mup = sectorI%H(1)%map(Indices(1))
              mdw = sectorI%H(2)%map(Indices(2))
              Nups(1,:) = Bdecomp(mup,Ns_Orb) ![Ns_Orb = Ns = Nlat*Norb*(Nbath+1) in CDMFT code]
@@ -1018,7 +1008,7 @@ contains
     write(unit,"(A)")"#a, b, Sz(I,J,a,b)"
     do iorb=1,Nimp
        do jorb=1,Nimp
-          write(unit,"(4I15,F15.9)")iorb,jorb,sz2(iorb,jorb)
+          write(unit,"(2I15,F15.9)")iorb,jorb,sz2(iorb,jorb)
        enddo
     enddo
     close(unit)
@@ -1027,7 +1017,7 @@ contains
     write(unit,"(A)")"#a, b, N2(I,J,a,b)"
     do iorb=1,Nimp
        do jorb=1,Nimp
-          write(unit,"(4I15,F15.9)")iorb,jorb,n2(iorb,jorb)
+          write(unit,"(2I15,F15.9)")iorb,jorb,n2(iorb,jorb)
        enddo
     enddo
     close(unit)

@@ -42,7 +42,8 @@ MODULE CDMFT_ED
 
   USE ED_MAIN, only: &
        ed_init_solver                                        , &
-       ed_solve
+       ed_solve                                              , &
+       ed_finalize_solver
 
   ! USE ED_OBSERVABLES,  only:                    &
   !      init_custom_observables                , &

@@ -4,15 +4,17 @@
 function g0and_replica_normal(a) result(G0and)
   real(8),dimension(:)                               :: a
   complex(8),dimension(Nspin,Nspin,Nimp,Nimp,Ldelta) :: G0and,Delta
-  complex(8),dimension(Nimp*Nspin,Nimp*Nspin)        :: fgorb
+  complex(8),dimension(Nimp*Nspin,Nimp*Nspin)        :: fgorb,hloc
   integer                                            :: i
   complex(8)                                         :: z
   !
   Delta = delta_replica_normal(a)
   !
+  hloc = nn2so_reshape(impHloc,Nspin,Nimp)
+  
   do i=1,Ldelta
      Z     = xi*Xdelta(i)+xmu
-     FGorb = Z*zeye(Nimp*Nspin) - nn2so_reshape(impHloc + Delta(:,:,:,:,i), Nspin,Nimp)
+     FGorb = Z*zeye(Nimp*Nspin) - hloc - nn2so_reshape(Delta(:,:,:,:,i),Nspin,Nimp)
      call inv(FGorb)
      G0and(:,:,:,:,i) = so2nn_reshape(FGorb,Nspin,Nimp)
   enddo
@@ -36,10 +38,10 @@ function g0and_replica_superc(a) result(G0and)
   real(8),dimension(Nbath)                                       :: Vk
   real(8),dimension(Nbath,Nlambdas)                              :: Lk
   !
-  stride = 1
+  stride = 0
   do ibath=1,Nbath
      !Get Vs
-     Vk(ibath)   = a(stride)
+     Vk(ibath)   = a(stride+1)
      stride      = stride + 1
      !Get Lambdas
      Lk(ibath,:) = a(stride+1:stride+Nlambdas)

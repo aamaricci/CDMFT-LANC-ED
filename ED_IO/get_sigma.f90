@@ -18,9 +18,9 @@ subroutine ed_get_sigma_site_n2(self,axis,type,z)
      select case(axis_)
      case default;stop "ed_get_sigma ERROR: axis is neither Matsubara, nor Realaxis"
      case ('m','M')
-        z_ = dcmplx(0d0,wm)
+        allocate(z_, source=dcmplx(0d0,wm))
      case ('r','R')
-        z_ = dcmplx(wr,eps)
+        allocate(z_, source=dcmplx(wr,eps))
      end select
   endif
   !
@@ -30,7 +30,7 @@ subroutine ed_get_sigma_site_n2(self,axis,type,z)
   !
   if(allocated(F))deallocate(F)
   allocate(F(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,L))
-  F = get_Sigma(z_)
+  F = get_Sigma(z_,axis_)
   !
   select case(type_)
   case default; stop "ed_get_sigma ERROR: type is neither Normal, nor Anomalous"
@@ -66,9 +66,9 @@ subroutine ed_get_sigma_site_n4(self,axis,type,z)
      select case(axis_)
      case default;stop "ed_get_sigma ERROR: axis is neither Matsubara, nor Realaxis"
      case ('m','M')
-        z_ = dcmplx(0d0,wm)
+        allocate(z_, source=dcmplx(0d0,wm))
      case ('r','R')
-        z_ = dcmplx(wr,eps)
+        allocate(z_, source=dcmplx(wr,eps))
      end select
   endif
   !
@@ -76,8 +76,8 @@ subroutine ed_get_sigma_site_n4(self,axis,type,z)
   call assert_shape(self,[Nspin,Nspin,Nimp,Nimp,L],'ed_get_sigma','self')
   !
   if(allocated(F))deallocate(F)
-  allocate(F(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,L))  
-  F = get_Sigma(z_)
+  allocate(F(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,L))
+  F = get_Sigma(z_,axis_)
   !
   select case(type_)
   case default; stop "ed_get_sigma ERROR: type is neither Normal, nor Anomalous"
@@ -110,16 +110,16 @@ subroutine ed_get_sigma_site_n6(self,axis,z)
      select case(axis_)
      case default;stop "ed_get_sigma ERROR: axis is neither Matsubara, nor Realaxis"
      case ('m','M')
-        z_ = dcmplx(0d0,wm)
+        allocate(z_, source=dcmplx(0d0,wm))
      case ('r','R')
-        z_ = dcmplx(wr,eps)
+        allocate(z_, source=dcmplx(wr,eps))
      end select
   endif
   !
   L = size(z_)
   call assert_shape(self,[Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,L],'ed_get_sigma','self')
   !
-  Self = get_Sigma(z_)
+  Self = get_Sigma(z_,axis_)
   !
   call deallocate_grids
   !

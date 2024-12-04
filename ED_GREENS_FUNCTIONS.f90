@@ -195,14 +195,14 @@ contains
                    select case(ed_mode)
                    case default
                       suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
-                      call splot("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
-                      call splot("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
+                      call splot("impG0"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
+                      call splot("impG0"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
                    case("superc")
                       suffix="_Isite"//str(ilat,4)//"_Jsite"//str(jlat,4)//"_l"//str(iorb)//str(jorb)//"_s"//str(ispin)
-                      call splot("impG"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
-                      call splot("impF"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,2,ispin,ispin,io,jo,:))
-                      call splot("impG"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
-                      call splot("impF"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,2,ispin,ispin,io,jo,:))
+                      call splot("impG0"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,1,ispin,ispin,io,jo,:))
+                      call splot("impF0"//reg(suffix)//"_iw"//reg(ed_file_suffix)//".ed",wm,Gmats(1,2,ispin,ispin,io,jo,:))
+                      call splot("impG0"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,1,ispin,ispin,io,jo,:))
+                      call splot("impF0"//reg(suffix)//"_realw"//reg(ed_file_suffix)//".ed",wr,Greal(1,2,ispin,ispin,io,jo,:))
                    end select
                 enddo
              enddo
@@ -248,7 +248,7 @@ contains
           s2 = Smats(1,1,ispin,ispin,iorb,iorb,2)
           simp(ispin,iorb) = dimag(s1) - &
                wm1*( dimag(s2)-dimag(s1) )/(wm2-wm1)
-          zimp(iorb,ispin) = 1.d0/( 1.d0 + abs( dimag(s1)/wm1 ))
+          zimp(ispin,iorb) = 1.d0/( 1.d0 + abs( dimag(s1)/wm1 ))
        enddo
     enddo
     !

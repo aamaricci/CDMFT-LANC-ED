@@ -47,8 +47,8 @@ contains
        print *, "         be aware that CG_POW is not doing what you would expect for a chi^q"
     endif
     !
-    call allocate_dmft_bath(dmft_bath)
-    call set_dmft_bath(bath_,dmft_bath)
+    call allocate_dmft_bath(dmft_bath_fit)
+    call set_dmft_bath(bath_,dmft_bath_fit)
     allocate(array_bath(size(bath_)-1))
     Nlambdas   = nint(bath_(1))
     array_bath = bath_(2:)
@@ -177,15 +177,15 @@ contains
     write(unit,"(ES18.9,1x,I5)") chi,iter
     close(unit)
     !
-    bath_(Nbath+1:size(bath_))=array_bath
-    call set_dmft_bath(bath_,dmft_bath)               ! *** bath_ --> dmft_bath ***    (per write fit result)
-    call write_dmft_bath(dmft_bath,LOGfile)
-    call save_dmft_bath(dmft_bath)
+    bath_(2:) = array_bath
+    call set_dmft_bath(bath_,dmft_bath_fit)               ! *** bath_ --> dmft_bath ***    (per write fit result)
+    call write_dmft_bath(dmft_bath_fit,LOGfile)
+    call save_dmft_bath(dmft_bath_fit)
     !
     call write_fit_result()
     !
-    call get_dmft_bath(dmft_bath,bath_)               ! ***  dmft_bath --> bath_ ***    (bath in output)
-    call deallocate_dmft_bath(dmft_bath)
+    call get_dmft_bath(dmft_bath_fit,bath_)               ! ***  dmft_bath --> bath_ ***    (bath in output)
+    call deallocate_dmft_bath(dmft_bath_fit)
     deallocate(FGmatrix,Hmask,Xdelta,Wdelta)
     deallocate(array_bath)
     !
@@ -195,9 +195,9 @@ contains
       complex(8)        :: fgand(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Ldelta)
       real(8)           :: w
       if(cg_scheme=='weiss')then
-         fgand = g0and_bath_function(xi*Xdelta,dmft_bath)
+         fgand = g0and_bath_function(xi*Xdelta,dmft_bath_fit)
       else
-         fgand = delta_bath_function(xi*Xdelta,dmft_bath)
+         fgand = delta_bath_function(xi*Xdelta,dmft_bath_fit)
       endif
       !
       do ispin=1,Nspin
@@ -258,8 +258,8 @@ contains
        print *, "         be aware that CG_POW is not doing what you would expect for a chi^q"
     endif
     !
-    call allocate_dmft_bath(dmft_bath)
-    call set_dmft_bath(bath_,dmft_bath)
+    call allocate_dmft_bath(dmft_bath_fit)
+    call set_dmft_bath(bath_,dmft_bath_fit)
     allocate(array_bath(size(bath_)-1))
     Nlambdas  =nint(bath_(1))
     array_bath=bath_(2:)
@@ -362,15 +362,15 @@ contains
     write(unit,"(ES18.9,1x,I5)") chi,iter
     close(unit)
     !
-    bath_(Nbath+1:size(bath_))=array_bath
-    call set_dmft_bath(bath_,dmft_bath) ! *** array_bath --> dmft_bath *** (per write fit result)
-    call write_dmft_bath(dmft_bath,LOGfile)
-    call save_dmft_bath(dmft_bath)
+    bath_(2:) = array_bath
+    call set_dmft_bath(bath_,dmft_bath_fit) ! *** array_bath --> dmft_bath *** (per write fit result)
+    call write_dmft_bath(dmft_bath_fit,LOGfile)
+    call save_dmft_bath(dmft_bath_fit)
     !
     call write_fit_result()
     !
-    call get_dmft_bath(dmft_bath,bath_)                ! ***  dmft_bath --> bath_ ***    (bath in output)
-    call deallocate_dmft_bath(dmft_bath)
+    call get_dmft_bath(dmft_bath_fit,bath_)                ! ***  dmft_bath --> bath_ ***    (bath in output)
+    call deallocate_dmft_bath(dmft_bath_fit)
     deallocate(FGmatrix,FFmatrix,Hmask,Xdelta,Wdelta)
     deallocate(array_bath)
     ! deallocate(Nlambdas)
@@ -381,9 +381,9 @@ contains
       complex(8)                       :: fgand(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Ldelta)
       real(8)                          :: w
       if(cg_scheme=='weiss')then
-         fgand = g0and_bath_function(xi*Xdelta,dmft_bath)
+         fgand = g0and_bath_function(xi*Xdelta,dmft_bath_fit)
       else
-         fgand = delta_bath_function(xi*Xdelta,dmft_bath)
+         fgand = delta_bath_function(xi*Xdelta,dmft_bath_fit)
       endif
       !
       do ispin=1,Nspin

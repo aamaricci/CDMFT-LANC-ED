@@ -11,10 +11,10 @@ function delta_replica_normal(a) result(Delta)
   complex(8)                                              :: iw
   !
   !Get Hs
-  stride = 1
+  stride = 0
   do ibath=1,Nbath
      !Get Vs
-     Vk(ibath)  = a(stride)
+     Vk(ibath)  = a(stride+1)
      stride     = stride + 1
      !Get Lambdas
      Lk(ibath,:)= a(stride+1:stride+Nlambdas)
