@@ -37,7 +37,7 @@ contains
     integer                                                       :: isector   
     complex(8),dimension(:,:),allocatable                         :: Htmp_up,Htmp_dw,Hrdx
     integer,dimension(Ns)                                         :: ibup,ibdw
-    integer,dimension(Nimp)                                       :: Nup,Ndw
+    integer,dimension(Ns)                                         :: Nup,Ndw
     complex(8),dimension(Nambu,Nambu,Nspin,Nspin,Nimp,Nimp,Nbath) :: Hbath_tmp
     !
     nup=zero
@@ -87,16 +87,20 @@ contains
     !
     !-----------------------------------------------!
     !LOCAL HAMILTONIAN TERMS
+    print*,"entering Hlocal"
     include "stored/H_local.f90"
     !
     !UP TERMS
+    print*,"entering Hup"
     include "stored/H_up.f90"
     !
     !DW TERMS
+    print*,"entering Hdw"
     include "stored/H_dw.f90"
     !
     !NON-LOCAL HAMILTONIAN TERMS
     if(jhflag)then
+       print*,"entering H_non_local"
        include "stored/H_non_local.f90"
     endif
     !

@@ -73,9 +73,6 @@ contains
     !
     ndx = Nsym
     !
-    !for each replica we also store Nsym itself
-    ndx = ndx+1
-    !
     !number of replicas
     ndx = ndx * Nbath
     !diagonal hybridizations: Vs
@@ -83,8 +80,11 @@ contains
     ! case("replica")
     !    ndx = ndx + Nbath
     ! case("general")
-    ndx = ndx + Nbath*Nimp*Nspin
+    ndx = ndx + Nbath*(Norb*Nlat)*Nspin
     ! end select
+    !
+    !we also store Nsym itself
+    ndx = ndx+1
     !
     bath_size = ndx
     !
@@ -95,21 +95,21 @@ contains
   function get_bath_dimension_direct_d2(Hloc) result(bath_size)
     complex(8),intent(in)              :: Hloc(:,:) !optional input matrix with dimension [ |Nlso| , |Nlso| ] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
     integer                                     :: bath_size
-    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: H
+    complex(8),dimension(Nspin,Nspin,Norb*Nlat,Norb*Nlat) :: H
     integer                                     :: ndx
     !
     if(ed_mode=='superc')stop "get_bath_dimension_direct_d2 ERROR: called with ed_mode=superc"
-    call assert_shape(Hloc,[Nspin*Nimp,Nspin*Nimp],"get_bath_dimension_direct_d2","Hloc")
+    call assert_shape(Hloc,[Nspin*Norb*Nlat,Nspin*Norb*Nlat],"get_bath_dimension_direct_d2","Hloc")
     !
-    H = so2nn_reshape(Hloc,Nspin,Nimp)
+    H = so2nn_reshape(Hloc,Nspin,Norb*Nlat)
     !
     ndx=0
     do ispin=1,Nspin
        do jspin=1,Nspin
-          do iorb=1,Nimp
-             do jorb=1,Nimp
-                io = iorb + (ispin-1)*Nimp
-                jo = jorb + (jspin-1)*Nimp
+          do iorb=1,Norb*Nlat
+             do jorb=1,Norb*Nlat
+                io = iorb + (ispin-1)*Norb*Nlat
+                jo = jorb + (jspin-1)*Norb*Nlat
                 if(io > jo)cycle
                 if(dreal(H(ispin,jspin,iorb,jorb)) /= 0d0)ndx=ndx+1
                 if(dimag(H(ispin,jspin,iorb,jorb)) /= 0d0)ndx=ndx+1
@@ -126,7 +126,7 @@ contains
     ! case("replica")
     !    ndx = ndx + Nbath
     ! case("general")
-    ndx = ndx + Nbath*Nimp*Nspin
+    ndx = ndx + Nbath*Norb*Nlat*Nspin
     ! end select
     !
     bath_size = ndx
@@ -137,21 +137,21 @@ contains
   function get_bath_dimension_direct_d4(Hloc) result(bath_size)
     complex(8),intent(in)              :: Hloc(:,:,:,:) !optional input matrix with dimension [ |Nspin| , |Nspin| , |Nimp| , |Nimp|] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
     integer                                     :: bath_size
-    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: H
+    complex(8),dimension(Nspin,Nspin,Norb*Nlat,Norb*Nlat) :: H
     integer                                     :: ndx
     !
     if(ed_mode=='superc')stop "get_bath_dimension_direct_d2 ERROR: called with ed_mode=superc"
-    call assert_shape(Hloc,[Nspin,Nspin,Nimp,Nimp],"get_bath_dimension_direct_d4","Hloc")
+    call assert_shape(Hloc,[Nspin,Nspin,Norb*Nlat,Norb*Nlat],"get_bath_dimension_direct_d4","Hloc")
     !
     H = Hloc
     !
     ndx=0
     do ispin=1,Nspin
        do jspin=1,Nspin
-          do iorb=1,Nimp
-             do jorb=1,Nimp
-                io = iorb + (ispin-1)*Nimp
-                jo = jorb + (jspin-1)*Nimp
+          do iorb=1,Norb*Nlat
+             do jorb=1,Norb*Nlat
+                io = iorb + (ispin-1)*Norb*Nlat
+                jo = jorb + (jspin-1)*Norb*Nlat
                 if(io > jo)cycle
                 if(dreal(H(ispin,jspin,iorb,jorb)) /= 0d0)ndx=ndx+1
                 if(dimag(H(ispin,jspin,iorb,jorb)) /= 0d0)ndx=ndx+1
@@ -168,7 +168,7 @@ contains
     ! case("replica")
     !    ndx = ndx + Nbath
     ! case("general")
-    ndx = ndx + Nbath*Nimp*Nspin
+    ndx = ndx + Nbath*Norb*Nlat*Nspin
     ! end select
     !
     bath_size = ndx
@@ -179,11 +179,11 @@ contains
   function get_bath_dimension_direct_d6(Hloc) result(bath_size)
     complex(8),intent(in)                       :: Hloc(:,:,:,:,:,:) !optional input matrix with dimension [ |Nlat| , |Nlat| , |Nspin| , |Nspin| , |Norb| , |Norb|] used to count the number of bath parameters in replica/general values of :f:var:`bath_type`.
     integer                                     :: bath_size
-    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: H
+    complex(8),dimension(Nspin,Nspin,Norb*Nlat,Norb*Nlat) :: H
     integer                                     :: ndx
     !
     if(ed_mode=='superc')stop "get_bath_dimension_direct_d2 ERROR: called with ed_mode=superc"
-    call assert_shape(Hloc,[Nlat,Nlat,Nspin,Nspin,Nimp,Nimp],"get_bath_dimension_direct_d6","Hloc")
+    call assert_shape(Hloc,[Nlat,Nlat,Nspin,Nspin,Norb*Nlat,Norb*Nlat],"get_bath_dimension_direct_d6","Hloc")
     !
     do concurrent(ilat=1:Nlat,jlat=1:Nlat,ispin=1:Nspin,jspin=1:Nspin,iorb=1:Norb,jorb=1:Norb)
        io = iorb+(ilat-1)*Norb
@@ -194,10 +194,10 @@ contains
     ndx=0
     do ispin=1,Nspin
        do jspin=1,Nspin
-          do iorb=1,Nimp
-             do jorb=1,Nimp
-                io = iorb + (ispin-1)*Nimp
-                jo = jorb + (jspin-1)*Nimp
+          do iorb=1,Norb*Nlat
+             do jorb=1,Norb*Nlat
+                io = iorb + (ispin-1)*Norb*Nlat
+                jo = jorb + (jspin-1)*Norb*Nlat
                 if(io > jo)cycle
                 if(dreal(H(ispin,jspin,iorb,jorb)) /= 0d0)ndx=ndx+1
                 if(dimag(H(ispin,jspin,iorb,jorb)) /= 0d0)ndx=ndx+1
@@ -214,7 +214,7 @@ contains
     ! case("replica")
     !    ndx = ndx + Nbath
     ! case("general")
-    ndx = ndx + Nbath*Nimp*Nspin
+    ndx = ndx + Nbath*Norb*Nlat*Nspin
     ! end select
     !
     bath_size = ndx
@@ -247,7 +247,7 @@ contains
     select case (bath_type)
     case default;stop "ERROR check_bath_dimension: bath_type!=replica/general"
     case ('replica','general')
-       Ntrue   = get_bath_dimension_symmetries(size(Hbath_basis))
+       Ntrue   = get_bath_dimension_symmetries(size(Hbath_lambda,2))
     end select
     bool  = ( size(bath_) == Ntrue )
   end function check_bath_dimension

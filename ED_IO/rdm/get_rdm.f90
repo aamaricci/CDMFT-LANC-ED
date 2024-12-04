@@ -28,7 +28,7 @@ end subroutine ed_get_cluster_density_matrix_single
 subroutine ed_get_reduced_density_matrix_single(rdm,orbital_mask,doprint)
   !! further reduce the cdm by tracing out selected orbitals (via mask)
   complex(8),dimension(:,:),allocatable,intent(inout) :: rdm
-  logical,dimension(Nlat,Norb),intent(in)             :: orbital_mask
+  logical,dimension(Nimp),intent(in)                  :: orbital_mask
   logical,intent(in),optional                         :: doprint
   logical                                             :: doprint_
   logical                                             :: dotrace_
@@ -50,9 +50,8 @@ subroutine ed_get_reduced_density_matrix_single(rdm,orbital_mask,doprint)
   !
   ! Input handling and checks
   Nred = count(orbital_mask)
-  if(Nred<1)then
-     stop "ERROR: invalid orbital mask, the reduced system must consist of at least one orbital"
-  elseif(Nred==Nimp)then
+  if(Nred<1)stop "ERROR: invalid orbital mask, the reduced system must consist of at least one orbital"  
+  if(Nred==Nimp)then
      dotrace_ = .FALSE.
   else
      dotrace_ = .TRUE.
@@ -64,22 +63,21 @@ subroutine ed_get_reduced_density_matrix_single(rdm,orbital_mask,doprint)
   if(.not.allocated(cluster_density_matrix))stop "ERROR: cluster_density_matrix is not allocated"
   !  
   associate(cdm => cluster_density_matrix)
-    if(.not.dotrace_)then       
+    if(.not.dotrace_)then
        ! Pour the whole cdm into the rdm
        rdm = cdm ! and that's all we do…
     else
        ! Retrieve the requested bit-indices for the reduced/traced system
-       red_count = 0; trace_count = 0
-       do ilat = 1,Nlat
-          do jorb=1,Norb
-             if(orbital_mask(ilat,jorb))then
-                red_count = red_count + 1
-                red_indices(red_count) = jorb + (ilat-1)*Norb
-             else
-                trace_count = trace_count + 1
-                trace_indices(trace_count) = jorb + (ilat-1)*Norb
-             endif
-          enddo
+       red_count   = 0
+       trace_count = 0
+       do io=1,Nimp
+          if(orbital_mask(io))then
+             red_count              = red_count + 1
+             red_indices(red_count) = io
+          else
+             trace_count                = trace_count + 1
+             trace_indices(trace_count) = io
+          endif
        enddo
        !
        allocate(rdm(4**Nred,4**Nred))
@@ -128,12 +126,12 @@ contains
   !
   subroutine get_sign(sign,state,indices)
     !! Compute the Fermionic sign associated to the required swipes
-    real(8), intent(out) :: sign
-    integer, intent(in)  :: state(Nimp)
-    integer, intent(in)  :: indices(:)
-    integer              :: filtered(Nimp)
-    integer              :: N
-    integer              :: r
+    real(8), intent(out)                              :: sign
+    integer, intent(in)                               :: state(Nimp)
+    integer, intent(in)                               :: indices(:)
+    integer                                           :: filtered(Nimp)
+    integer                                           :: N
+    integer                                           :: r
     ! FILTER THE STATE TO CONSTRAIN THE SUM
     filtered = state; filtered(indices)=0
     ! PERFORM THE SUM (count permutations)
@@ -151,13 +149,13 @@ contains
   !
   subroutine split_state(state,reduced_indices,tracing_indices,reduced_state,tracing_state)
     !! Extract the reduced and tracing subsystems, given the appropriate bit-indices
-    integer,intent(in),allocatable :: state(:)
-    integer,intent(in),allocatable :: reduced_indices(:)
-    integer,intent(in),allocatable :: tracing_indices(:)
-    integer,intent(out)            :: reduced_state
-    integer,intent(out)            :: tracing_state
-    integer,allocatable            :: reduced_ibits(:)
-    integer,allocatable            :: tracing_ibits(:)
+    integer,intent(in),allocatable                    :: state(:)
+    integer,intent(in),allocatable                    :: reduced_indices(:)
+    integer,intent(in),allocatable                    :: tracing_indices(:)
+    integer,intent(out)                               :: reduced_state
+    integer,intent(out)                               :: tracing_state
+    integer,allocatable                               :: reduced_ibits(:)
+    integer,allocatable                               :: tracing_ibits(:)
     !
     reduced_ibits = state(reduced_indices)
     tracing_ibits = state(tracing_indices)

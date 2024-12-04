@@ -161,7 +161,7 @@ contains
        enddo
        !
        diagonal_hsym = is_diagonal(Hbath_basis(isym)%O)
-       one_lambdaval = Hbath_lambda(ibath,isym)
+       one_lambdaval = Hbath_lambda(1,isym)
        all_are_equal = all(Hbath_lambda(:,isym)==one_lambdaval)
        !
        if(diagonal_hsym.AND.all_are_equal.AND.Nbath>1)then

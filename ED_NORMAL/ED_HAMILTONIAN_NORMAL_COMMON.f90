@@ -18,8 +18,7 @@ MODULE ED_HAMILTONIAN_NORMAL_COMMON
   integer,allocatable,dimension(:)          :: DimDws
   !
   type(sector)                              :: Hsector
-
-
+  !
   integer                                   :: iiup,iidw,jjup,jjdw
   integer                                   :: iud,jj
   integer                                   :: ishift

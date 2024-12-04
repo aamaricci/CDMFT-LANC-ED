@@ -5,7 +5,7 @@ STRING(TOLOWER "${CMAKE_Fortran_COMPILER_ID}" FC_ID)
 STRING(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
 
 #default prefix is $HOME/opt/<libname>/<fc_id>/[<git_branch>[/<debug>]]/<version>
-SET(PREFIX_DEF_LOC "$ENV{HOME}/opt")
+SET(PREFIX_DEF_LOC "$ENV{HOME}/.bin")#SET(PREFIX_DEF_LOC "$ENV{HOME}/opt")
 SET(PREFIX_PROJ "${PROJECT_NAME}")
 SET(PREFIX_PATH "${FC_ID}")
 

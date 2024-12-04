@@ -165,9 +165,10 @@ MODULE ED_VARS_GLOBAL
   integer,save                                           :: Ns_orb
   integer,save                                           :: Ns_ud
   integer                                                :: Nlevels
-  integer                                                :: Nimp     !Total number of levels in the impurity cluster: Nlat*Norb
-  integer                                                :: Nambu   !Global Nambu factor for SC calculations
-  
+  integer                                                :: Nimp                !Total number of levels in the impurity cluster: Nlat*Norb
+  ! moved to INPUT_VARS
+  ! integer                                          :: Nambu               !Global Nambu factor for SC calculations 
+
 
   !Some maps between sectors and full Hilbert space (pointers)
   !PRIVATE:

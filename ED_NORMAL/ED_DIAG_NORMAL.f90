@@ -211,6 +211,7 @@ contains
        else                     !else LAPACK_SOLVE
           allocate(eig_values(Dim)) ; eig_values=0d0
           allocate(eig_basis_tmp(Dim,Dim)) ; eig_basis_tmp=zero
+          !
           call build_Hv_sector_normal(isector,eig_basis_tmp)
           !
           if(MpiMaster)call eigh(eig_basis_tmp,eig_values)

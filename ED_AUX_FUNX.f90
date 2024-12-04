@@ -319,7 +319,8 @@ contains
 
   function bdecomp(i,Ntot) result(ivec)
     !Binary decomposition of the integer :f:var:`i` with  :f:var:`ntot` bits. The input integers represents a Fock state :math:`|i-1\rangle` with :math:`i=1,\dots,2^{2N_s}`. The resulting vector :f:var:`ivec` describes the state :math:`|n_1,n_2,\dots,n_{N_{tot}}\rangle` with :math:`n_i=0,1`. 
-    integer :: Ntot,ivec(Ntot),l,i
+    integer :: Ntot
+    integer :: ivec(Ntot),l,i
     logical :: busy
     do l=0,Ntot-1
        busy=btest(i,l)

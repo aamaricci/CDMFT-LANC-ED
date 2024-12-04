@@ -127,17 +127,17 @@ contains
        allocate(self%Nups(Ns_Ud))
        allocate(self%Ndws(Ns_Ud))
        !
-       call get_Nup(isector,Nups);self%Nup=sum(self%Nups)
-       call get_Ndw(isector,Ndws);self%Ndw=sum(self%Ndws)
-       call get_DimUp(isector,DimUps);self%DimUp=product(self%DimUps)
-       call get_DimDw(isector,DimDws);self%DimDw=product(self%DimDws)
-       !
+       call get_Nup(isector,self%Nups);self%Nup=sum(self%Nups)
+       call get_Ndw(isector,self%Ndws);self%Ndw=sum(self%Ndws)
+       call get_DimUp(isector,self%DimUps);self%DimUp=product(self%DimUps)
+       call get_DimDw(isector,self%DimDws);self%DimDw=product(self%DimDws)
+       !       
        self%Dim = self%DimUp*self%DimDw
        !
        if(itrace_)then
-          call map_allocate(self%H,[self%DimUps,self%DimDws],impDim)
+          call map_allocate(self%H,[self%DimUp,self%DimDw],impDim)
        else
-          call map_allocate(self%H,[self%DimUps,self%DimDws])
+          call map_allocate(self%H,[self%DimUp,self%DimDw])
        endif
        !
        do iud=1,Ns_Ud
@@ -195,6 +195,8 @@ contains
        enddo
 
     end select
+    !
+    self%status=.true.
     !
   end subroutine build_sector
 

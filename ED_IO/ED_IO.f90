@@ -418,13 +418,13 @@ contains
   !                      PRINT DENSITY MATRICES
   !+------------------------------------------------------------------+
   subroutine ed_print_dm_orb(dm,orbital_mask,ineq)
-    complex(8),dimension(:,:),intent(in)            :: dm
-    logical,dimension(Nlat,Norb),intent(in)         :: orbital_mask
-    integer                  ,intent(in),optional   :: ineq
-    integer                                         :: unit,Nsites
-    character(len=64)                               :: fname,suffix
-    integer                                         :: io,jo,Nrdm
-    integer,allocatable,dimension(:)                :: s1,s2,s3,s4
+    complex(8),dimension(:,:),intent(in)          :: dm
+    logical,dimension(Nimp),intent(in)            :: orbital_mask
+    integer                  ,intent(in),optional :: ineq
+    integer                                       :: unit,Nsites
+    character(len=64)                             :: fname,suffix
+    integer                                       :: ilat,iorb,Nrdm,io
+    integer,allocatable,dimension(:)              :: s1,s2,s3,s4
     !
     Nrdm = 4**count(orbital_mask)
     !
@@ -433,9 +433,10 @@ contains
     endif
     !
     suffix = ""
-    do io = 1,Nlat
-       do jo = 1,Norb
-          if(orbital_mask(io,jo))then
+    do ilat = 1,Nlat
+       do iorb = 1,Norb
+          i = iorb + (ilat-1)*Norb
+          if(orbital_mask(i))then
              suffix = trim(suffix)//"_i"//reg(str(io))//"l"//reg(str(jo))
           endif
        enddo

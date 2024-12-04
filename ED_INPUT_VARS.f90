@@ -13,7 +13,7 @@ MODULE ED_INPUT_VARS
   integer(c_int), bind(c, name="Norb")             :: Norb                !Number of impurity orbitals
   integer(c_int), bind(c, name="Nspin")            :: Nspin               !Number spin degeneracy (max 2)
   integer(c_int), bind(c, name="Nbath")            :: Nbath               !Number of bath sites (per orbital or not depending on bath_type)
-
+  integer(c_int), bind(c, name="Nambu")            :: Nambu               !Global Nambu factor for SC calculations
 
   integer(c_int), bind(c, name="Nloop")            :: Nloop               !max dmft loop variables
   real(c_double),dimension(5),bind(c, name="Uloc") :: Uloc                !local interactions
@@ -140,11 +140,10 @@ contains
     call parse_input_variable(Nlat,"NLAT",INPUTunit,default=1,comment="Number of cluster sites")
     call parse_input_variable(Norb,"NORB",INPUTunit,default=1,comment="Number of impurity orbitals (max 5).")
     call parse_input_variable(Nspin,"NSPIN",INPUTunit,default=1,comment="Number of spin degeneracy (max 2)")
-    call parse_input_variable(Nbath,"NBATH",INPUTunit,default=6,comment="Number of bath clusters (replicas or generalizations)")
+    call parse_input_variable(Nbath,"NBATH",INPUTunit,default=4,comment="Number of bath clusters (replicas or generalizations)")
+    ! call parse_input_variable(Nbath,"NAMBU",INPUTunit,default=1,comment="Global Nambu factor for SC calculations")
     call parse_input_variable(bath_type,"BATH_TYPE",INPUTunit,default='replica',comment="flag to set bath type: 'replica' or 'general'")
-
-
-
+    
     call parse_input_variable(uloc,"ULOC",INPUTunit,default=[2d0,0d0,0d0,0d0,0d0],comment="Values of the local interaction per orbital (max 5)")
     call parse_input_variable(ust,"UST",INPUTunit,default=0.d0,comment="Value of the inter-orbital interaction term")
     call parse_input_variable(Jh,"JH",INPUTunit,default=0.d0,comment="Hunds coupling")
@@ -158,10 +157,12 @@ contains
     call parse_input_variable(gf_flag,"GF_FLAG",INPUTunit,default=.true.,comment="flag to evaluate GFs and related quantities.")
     call parse_input_variable(dm_flag,"DM_FLAG",INPUTunit,default=.false.,comment="flag to evaluate the cluster density matrix \rho_IMP = Tr_BATH(\rho))")
     !
-
     call parse_input_variable(ed_mode,"ED_MODE",INPUTunit,default='normal',comment="Flag to set ED type: normal=normal, superc=superconductive, nonsu2=broken SU(2)")
+    Nambu = 1; if(ed_mode=="superc")Nambu = 2
+    !
     call parse_input_variable(ed_twin_,"ED_TWIN",INPUTunit,default=.false.,comment="flag to reduce (T) or not (F,default) the number of visited sector using twin symmetry.")
     ed_twin = ed_twin_
+    !
     call parse_input_variable(ed_sectors,"ED_SECTORS",INPUTunit,default=.false.,comment="flag to reduce sector scan for the spectrum to specific sectors +/- ed_sectors_shift.")
     call parse_input_variable(ed_sectors_shift,"ED_SECTORS_SHIFT",INPUTunit,1,comment="shift to ed_sectors")
     call parse_input_variable(ed_sparse_H,"ED_SPARSE_H",INPUTunit,default=.true.,comment="flag to select  storage of sparse matrix H (mem--, cpu++) if TRUE, or direct on-the-fly H*v product (mem++, cpu--) if FALSE ")

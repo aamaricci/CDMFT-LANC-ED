@@ -8,7 +8,7 @@ program cdn_hm_2dsquare
   !
   implicit none
   integer                                     :: Nx,Ny,Nimp,Nlso,iloop,Nb,Nkx,Nky,Nsym
-  integer                                     :: io,jo,ilat,jlat,irepl,iw,ispin,jspin,is,js,i,j
+  integer                                     :: ilat,jlat,irepl,i,j,io,jo,iorb,jorb
   logical                                     :: converged
   real(8)                                     :: ts,wmixing,delta,dens_average,onsite
   real(8),allocatable,dimension(:)            :: dens_mats
@@ -27,11 +27,7 @@ program cdn_hm_2dsquare
   complex(8),allocatable                      :: Sigma(:,:,:)
   !Density matrices:
   complex(8),allocatable,dimension(:,:)       :: reduced_density_matrix
-  logical,allocatable,dimension(:,:)          :: orbital_mask
-  complex(8),allocatable,dimension(:,:)       :: pure_cvec
-  real(8),allocatable,dimension(:)            :: pure_prob
-  !Luttinger invariants:
-  real(8),allocatable,dimension(:,:,:)        :: luttinger
+  logical,allocatable,dimension(:)            :: orbital_mask
   !SYMMETRY BASIS for BATH:
   real(8),dimension(:,:),allocatable          :: lambdasym_vectors
   complex(8),dimension(:,:,:),allocatable     :: Hsym_basis
@@ -100,6 +96,9 @@ program cdn_hm_2dsquare
   Nsym = 2
   allocate(lambdasym_vectors(Nbath,Nsym))
   allocate(Hsym_basis(Nspin*Nimp,Nspin*Nimp,Nsym))
+
+  print*,size(Hsym_basis,1),size(Hsym_basis,2),Nspin*Nimp
+
   !Replica onsite energies
   Hsym_basis(:,:,1) = zeye(Nspin*Nimp)
   !Replica hopping amplitudes
@@ -118,20 +117,25 @@ program cdn_hm_2dsquare
   endif
 
 
-
-  !SETUP BATH
-  call ed_set_Hbath(Hsym_basis,lambdasym_vectors)
-  Nb=ed_get_bath_dimension(Nsym=2)
-
   !SETUP Hloc
   call ed_set_hloc(Hloc)
 
+
+
+  !SETUP BATH
+  call ed_set_Hbath(Hsym_basis,lambdasym_vectors)
+  Nb=ed_get_bath_dimension(Nsym)
+
+  print*,"driver:",Nb
+
   !SETUP SOLVER
   allocate(bath(Nb))
-  allocate(bath_prev(Nb))
-  bath_prev=zero
   call ed_init_solver(bath)
 
+
+  allocate(bath_prev(Nb))
+  bath_prev=zero
+  
   !DMFT loop
   iloop=0;converged=.false.
   do while(.not.converged.AND.iloop<nloop)
@@ -142,25 +146,37 @@ program cdn_hm_2dsquare
      call ed_solve(bath)
      call ed_get_sigma(Smats,axis='mats')
 
+
      !Retrieve ALL REDUCED DENSITY MATRICES DOWN TO THE LOCAL one
      if(dm_flag.AND.master)then
+        !
+        if(.not.allocated(orbital_mask))allocate(orbital_mask(Nimp))
+        !
         ! All independent local RDMs (to check they are all equal)
-        if(.not.allocated(orbital_mask))allocate(orbital_mask(Nlat,Norb))
         do ilat=1,Nlat
-           orbital_mask = .false.
-           orbital_mask(ilat,:) = .true.
-           call ed_get_reduced_dm(reduced_density_matrix,orbital_mask,doprint=.true.)
-           !Semi-analytical crosscheck of the single-orbital density matrix            
-           call one_orb_benchmark(ilat,1,reduced_density_matrix)
+           do iorb=1,Norb
+              io = iorb + (ilat-1)*Norb
+              orbital_mask     = .false.
+              orbital_mask(io) = .true.
+              call ed_get_reduced_dm(reduced_density_matrix,orbital_mask,doprint=.true.)
+              !Semi-analytical crosscheck of the single-orbital density matrix            
+              call one_orb_benchmark(ilat,1,reduced_density_matrix)
+           enddo
         enddo
         ! All independent two-site RDMs (to check NN and NNN are equal)
         do ilat=1,Nlat-1
-           orbital_mask = .false.
-           orbital_mask(ilat,:) = .true.
-           do jlat=ilat+1,Nlat
-              orbital_mask(ilat+1:Nlat,:) = .false.
-              orbital_mask(jlat,:) = .true.
-              call ed_get_reduced_dm(reduced_density_matrix,orbital_mask,doprint=.true.)
+           do iorb=1,Norb
+              io = iorb + (ilat-1)*Norb
+              orbital_mask = .false.
+              orbital_mask(io) = .true.
+              do jlat=ilat+1,Nlat
+                 do jorb=1,Norb
+                    jo = jorb + (jlat-1)*Norb
+                    orbital_mask(io+1:Nimp) = .false.
+                    orbital_mask(jo) = .true.
+                    call ed_get_reduced_dm(reduced_density_matrix,orbital_mask,doprint=.true.)
+                 enddo
+              enddo
            enddo
         enddo
         !
@@ -197,9 +213,9 @@ program cdn_hm_2dsquare
         write(LOGfile,*)"Average ED-density:", sum(dens_ed)/Nimp
         !tot_density = density(up) + density(dw)
         dens_mats = zero
-        do io=1,Nimp
-           dens_mats(io) = dens_mats(io) + fft_get_density(Gmats(1,1,io,io,:),beta)
-           dens_mats(io) = dens_mats(io) + fft_get_density(Gmats(2,2,io,io,:),beta)
+        do i=1,Nimp
+           dens_mats(i) = dens_mats(i) + fft_get_density(Gmats(1,1,i,i,:),beta)
+           dens_mats(i) = dens_mats(i) + fft_get_density(Gmats(2,2,i,i,:),beta)
         enddo
         write(LOGfile,*)" "
         write(LOGfile,*)"Average FFT-density:", sum(dens_mats)/Nimp
@@ -221,13 +237,8 @@ program cdn_hm_2dsquare
   call dmft_get_gloc(Hk,Greal,Sreal,axis='real')
   call dmft_write_gf(Greal,"Gloc",axis='real',iprint=4)
 
-  ! !Compute the Kinetic Energy:
-  ! do concurrent(ispin=1:Nspin,jspin=1:Nspin,iorb=1:Nimp,jorb=1:Nimp)
-  !    io = iorb + (ispin-1)*Nspin
-  !    jo = jorb + (jspin-1)*Nspin
-  !    Sigma(io,jo)=Smats(ispin,jspin,iorb,jorb,:)
-  ! enddo
-  ! call dmft_kinetic_energy(Hk(:,:,:),Sigma)
+  !Compute the Kinetic Energy:
+  call dmft_kinetic_energy(Hk(:,:,:),nn2so_f(Smats,Lmats))
 
   call finalize_MPI()
 
@@ -253,8 +264,8 @@ contains
           do ix=1,Nx
              do iy=1,Ny
                 !
-                io   = iorb + (ilat-1)*Norb
                 ilat = indices2N([ix,iy])
+                io   = iorb + (ilat-1)*Norb
                 hopping_matrix(ispin,ispin,io,io)= zero!-mu_var
                 if(ix<Nx)then !Avoid x higher outbound
                    jlat = indices2N([ix+1,iy])
@@ -431,7 +442,7 @@ contains
 
 
 
-  
+
   !+---------------------------------------------------------------------------+
   !PURPOSE : check the local-dm comparing to Eq.4 in Mod.Phys.Lett.B.2013.27:05
   !+---------------------------------------------------------------------------+
@@ -470,6 +481,20 @@ contains
        Out(io,jo) = In(is,js,i,j)
     enddo
   end function nn2so
+  !
+  function nn2so_f(In,L) result(Out)
+    integer :: L
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp,L) :: In
+    complex(8),dimension(Nspin*Nimp,Nspin*Nimp,L) :: Out
+    integer :: is,js,i,j,io,jo
+    do concurrent(is=1:Nspin,js=1:Nspin,i=1:Nimp,j=1:Nimp)
+       io = i + (is-1)*Nimp
+       jo = j + (js-1)*Nimp
+       Out(io,jo,:) = In(is,js,i,j,:)
+    enddo
+  end function nn2so_f
+
+
 
   function so2nn(In) result(Out)
     complex(8),dimension(Nspin*Nimp,Nspin*Nimp) :: In
@@ -481,6 +506,18 @@ contains
        Out(is,js,i,j) = In(io,jo)
     enddo
   end function so2nn
+  !
+  function so2nn_f(In,L) result(Out)
+    integer :: L
+    complex(8),dimension(Nspin*Nimp,Nspin*Nimp,L) :: In
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp,L) :: Out
+    integer :: is,js,i,j,io,jo
+    do concurrent(is=1:Nspin,js=1:Nspin,i=1:Nimp,j=1:Nimp)
+       io = i + (is-1)*Nimp
+       jo = j + (js-1)*Nimp
+       Out(is,js,i,j,:) = In(io,jo,:)
+    enddo
+  end function so2nn_f
 
 end program cdn_hm_2dsquare
 
