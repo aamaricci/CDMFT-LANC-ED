@@ -1,7 +1,5 @@
 MODULE ED_IO
-  USE SF_LINALG
-  USE SF_ARRAYS, only: linspace,arange
-  USE SF_IOTOOLS, only: str,reg,free_unit,splot,sread
+  USE SCIFOR,only: linspace,arange,str,reg,free_unit,splot,sread,assert_shape
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX

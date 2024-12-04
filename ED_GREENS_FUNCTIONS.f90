@@ -1,5 +1,5 @@
 MODULE ED_GREENS_FUNCTIONS
-  USE SCIFOR, only: reg,txtfy
+  USE SCIFOR, only: reg,txtfy,splot
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
   USE ED_AUX_FUNX

@@ -12,6 +12,7 @@ module ED_DIAG_NORMAL
   !
   USE ED_INPUT_VARS
   USE ED_VARS_GLOBAL
+  USE ED_AUX_FUNX
   USE ED_EIGENSPACE
   USE ED_SETUP
   USE ED_SECTOR
@@ -409,7 +410,7 @@ contains
        open(free_unit(unit),file="sectors_list"//reg(ed_file_suffix)//".restart")       
        do istate=1,state_list%size
           isector = es_return_sector(state_list,istate)
-          call get_Indices(isector,Ns_Orb,Indices)
+          call get_QuantumNumbers(isector,Ns_Orb,Indices)
           write(unit,*)Indices
        enddo
        close(unit)

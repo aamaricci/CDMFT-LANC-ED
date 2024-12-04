@@ -7,35 +7,43 @@ program cdn_hm_2dsquare
   USE MPI
   !
   implicit none
-  integer                                         :: Nx,Ny,Nimp,Nlso,iloop,Nb,Nkx,Nky,Nsym
-  integer                                         :: ilat,jlat,irepl,iw,iii,jjj,kkk,Ntr
-  logical                                         :: converged
-  real(8)                                         :: ts,wmixing,delta,dens_average,onsite
-  real(8),allocatable,dimension(:)                :: dens_mats
-  real(8),allocatable,dimension(:,:)              :: dens_ed
+  integer                                     :: Nx,Ny,Nimp,Nlso,iloop,Nb,Nkx,Nky,Nsym
+  integer                                     :: io,jo,ilat,jlat,irepl,iw,ispin,jspin,is,js,i,j
+  logical                                     :: converged
+  real(8)                                     :: ts,wmixing,delta,dens_average,onsite
+  real(8),allocatable,dimension(:)            :: dens_mats
+  real(8),allocatable,dimension(:)            :: dens_ed
   !Bath:
-  real(8),allocatable                             :: bath(:),bath_prev(:)
+  real(8),allocatable                         :: bath(:),bath_prev(:)
   !The local hybridization function:
-  complex(8),allocatable                          :: Hloc(:,:)
-  complex(8),allocatable,dimension(:,:,:,:,:,:,:) :: Gmats,Greal,Smats,Sreal,Weiss
-  character(len=64)                               :: finput,foutput
-  complex(8),allocatable                          :: wm(:),wr(:)
-  complex(8),allocatable                          :: Hk(:,:,:),Smats_lso(:,:,:)
+  complex(8),allocatable                      :: Hloc(:,:)
+  complex(8),allocatable,dimension(:,:,:,:,:) :: Gmats
+  complex(8),allocatable,dimension(:,:,:,:,:) :: Greal
+  complex(8),allocatable,dimension(:,:,:,:,:) :: Smats
+  complex(8),allocatable,dimension(:,:,:,:,:) :: Sreal
+  complex(8),allocatable,dimension(:,:,:,:,:) :: Weiss
+  !freq array:
+  complex(8),allocatable                      :: Hk(:,:,:)
+  complex(8),allocatable                      :: Sigma(:,:,:)
   !Density matrices:
-  complex(8),allocatable,dimension(:,:)           :: reduced_density_matrix
-  logical,allocatable,dimension(:,:)              :: orbital_mask
-  complex(8),allocatable,dimension(:,:)           :: pure_cvec
-  real(8),allocatable,dimension(:)                :: pure_prob
+  complex(8),allocatable,dimension(:,:)       :: reduced_density_matrix
+  logical,allocatable,dimension(:,:)          :: orbital_mask
+  complex(8),allocatable,dimension(:,:)       :: pure_cvec
+  real(8),allocatable,dimension(:)            :: pure_prob
   !Luttinger invariants:
-  real(8),allocatable,dimension(:,:,:)            :: luttinger
+  real(8),allocatable,dimension(:,:,:)        :: luttinger
   !SYMMETRY BASIS for BATH:
-  real(8),dimension(:,:),allocatable              :: lambdasym_vectors
-  complex(8),dimension(:,:,:),allocatable         :: Hsym_basis
+  real(8),dimension(:,:),allocatable          :: lambdasym_vectors
+  complex(8),dimension(:,:,:),allocatable     :: Hsym_basis
+
+
+  character(len=64)                           :: finput,foutput
+
   !MPI VARIABLES (local use -> ED code has its own set of MPI variables)
-  integer                                         :: comm
-  integer                                         :: rank
-  integer                                         :: mpi_size
-  logical                                         :: master
+  integer                                     :: comm
+  integer                                     :: rank
+  integer                                     :: mpi_size
+  logical                                     :: master
 
   !Init MPI: use of MPI overloaded functions in SciFor
   call init_MPI(comm,.true.)
@@ -72,8 +80,6 @@ program cdn_hm_2dsquare
   Nlat = Nx*Ny
   Nimp = Nlat*Norb
   Nlso = Nspin*Nimp
-  wm   = xi*pi/beta*dreal(2*arange(1,Lmats)-1)
-  wr   = dcmplx(linspace(wini,wfin,Lreal),eps)
   !
   if(ED_VERBOSE > 0)call naming_convention()
   !  
@@ -83,7 +89,7 @@ program cdn_hm_2dsquare
   allocate(Greal(Nspin,Nspin,Nimp,Nimp,Lreal))
   allocate(Smats(Nspin,Nspin,Nimp,Nimp,Lmats))
   allocate(Sreal(Nspin,Nspin,Nimp,Nimp,Lreal))
-  allocate(Smats_lso(Nlso,Nlso,Lmats))
+  allocate(Sigma(Nlso,Nlso,Lmats))
 
 
   !Build Hk and Hloc
@@ -130,10 +136,10 @@ program cdn_hm_2dsquare
   iloop=0;converged=.false.
   do while(.not.converged.AND.iloop<nloop)
      iloop=iloop+1
-     if(master)call start_loop(iloop,nloop,"DMFT-loop")
+     call start_loop(iloop,nloop,"DMFT-loop")
 
      !Solve the EFFECTIVE IMPURITY PROBLEM (first w/ a guess for the bath)
-     call ed_solve(bath,lso2nnn(Hloc))
+     call ed_solve(bath)
      call ed_get_sigma(Smats,axis='mats')
 
      !Retrieve ALL REDUCED DENSITY MATRICES DOWN TO THE LOCAL one
@@ -162,12 +168,12 @@ program cdn_hm_2dsquare
 
 
      !Compute the local gfs on the imaginary axis:
-     call dmft_gloc_matsubara(Hk,Gmats,Smats)
-     if(master)call dmft_write_gf(Gmats,"Gloc",axis='matsubara',iprint=4)
+     call dmft_get_gloc(Hk,Gmats,Smats,axis="m")
+     call dmft_write_gf(Gmats,"Gloc",axis='matsubara',iprint=4)
      !
      !Get the Weiss field/Delta function to be fitted
      call dmft_self_consistency(Gmats,Smats,Weiss)
-     call Bcast_MPI(comm,Weiss)
+     call dmft_write_gf(Weiss,"Weiss",axis='mats',iprint=4)
      !
      !
      !Perform the SELF-CONSISTENCY by fitting the new bath
@@ -176,46 +182,52 @@ program cdn_hm_2dsquare
      !MIXING:
      if(iloop>1)bath = wmixing*bath + (1.d0-wmixing)*bath_prev
      bath_prev=bath
+     call Bcast_MPI(comm,bath)
+     !
      !
      !Check convergence (if required change chemical potential)
-     converged = check_convergence(Weiss(:,:,1,1,1,1,:),dmft_error,nsuccess,nloop)
-     if(nread/=0.d0)then
-        allocate(dens_mats(Nlat))
-        allocate(dens_ed(Nlat,Norb))
+     converged = check_convergence(Weiss(1,1,1,1,:),dmft_error,nsuccess,nloop)
+     call Bcast_MPI(comm,converged)
+     !
+     if(nread/=0d0)then
+        allocate(dens_mats(Nimp))
+        allocate(dens_ed(Nimp))
         call ed_get_dens(dens_ed)
-        dens_average = sum(dens_ed)/Nlo
         write(LOGfile,*)" "
-        write(LOGfile,*)"Average ED-density:", dens_average
+        write(LOGfile,*)"Average ED-density:", sum(dens_ed)/Nimp
+        !tot_density = density(up) + density(dw)
         dens_mats = zero
-        do ilat=1,Nlat
-           !tot_density = density(up) + density(dw)
-           dens_mats(ilat) = dens_mats(ilat) + fft_get_density(Gmats(ilat,ilat,1,1,1,1,:),beta)
-           dens_mats(ilat) = dens_mats(ilat) + fft_get_density(Gmats(ilat,ilat,2,2,1,1,:),beta)
+        do io=1,Nimp
+           dens_mats(io) = dens_mats(io) + fft_get_density(Gmats(1,1,io,io,:),beta)
+           dens_mats(io) = dens_mats(io) + fft_get_density(Gmats(2,2,io,io,:),beta)
         enddo
-        dens_average = sum(dens_mats)/Nlat
         write(LOGfile,*)" "
-        write(LOGfile,*)"Average FFT-density:", dens_average
+        write(LOGfile,*)"Average FFT-density:", sum(dens_mats)/Nimp
+        !
+        dens_average = sum(dens_mats)/Nimp
         call search_chemical_potential(xmu,dens_average,converged)
+
+        call Bcast_MPI(comm,xmu)
         deallocate(dens_mats)
         deallocate(dens_ed)
      endif
      !
-     call Bcast_MPI(comm,bath)
-     call Bcast_MPI(comm,converged)
-     call Bcast_MPI(comm,xmu)
      !
-     if(master)call end_loop
+     call end_loop
   enddo
 
   !Compute the local gfs on the real axis:
-  call dmft_gloc_realaxis(Hk,Greal,Sreal)
-  if(master)call dmft_write_gf(Greal,"Gloc",axis='realaxis',iprint=4)
+  call ed_get_sigma(Sreal,axis='real')
+  call dmft_get_gloc(Hk,Greal,Sreal,axis='real')
+  call dmft_write_gf(Greal,"Gloc",axis='real',iprint=4)
 
-  !Compute the Kinetic Energy:
-  do iw=1,Lmats
-     Smats_lso(:,:,iw)=nnn2lso(Smats(:,:,:,:,:,:,iw))
-  enddo
-  call dmft_kinetic_energy(Hk(:,:,:),Smats_lso)
+  ! !Compute the Kinetic Energy:
+  ! do concurrent(ispin=1:Nspin,jspin=1:Nspin,iorb=1:Nimp,jorb=1:Nimp)
+  !    io = iorb + (ispin-1)*Nspin
+  !    jo = jorb + (jspin-1)*Nspin
+  !    Sigma(io,jo)=Smats(ispin,jspin,iorb,jorb,:)
+  ! enddo
+  ! call dmft_kinetic_energy(Hk(:,:,:),Sigma)
 
   call finalize_MPI()
 
@@ -229,53 +241,60 @@ contains
   !
   !> Hloc = H_{hop_intra_cluster}
   function hloc_model(N) result (hloc)
-    integer                                               :: ilat,jlat,ispin,iorb,ind1,ind2,N
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb) :: hopping_matrix
-    complex(8),dimension(N,N)                             :: hloc
+    integer                                     :: ix,iy,ilat,jlat,ispin,iorb,io,jo,N
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: hopping_matrix
+    complex(8),dimension(N,N)                   :: hloc
     !
     hopping_matrix=zero
     !
     do ispin=1,Nspin
        do iorb=1,Norb
           !
-          do ilat=1,Nx
-             do jlat=1,Ny
-                ind1=indices2N([ilat,jlat])
-                hopping_matrix(ind1,ind1,ispin,ispin,iorb,iorb)= 0.d0!-mu_var
-                if(ilat<Nx)then !Avoid x higher outbound
-                   ind2=indices2N([ilat+1,jlat])
-                   hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb)= -ts
+          do ix=1,Nx
+             do iy=1,Ny
+                !
+                io   = iorb + (ilat-1)*Norb
+                ilat = indices2N([ix,iy])
+                hopping_matrix(ispin,ispin,io,io)= zero!-mu_var
+                if(ix<Nx)then !Avoid x higher outbound
+                   jlat = indices2N([ix+1,iy])
+                   jo   = iorb + (jlat-1)*Norb
+                   hopping_matrix(ispin,ispin,io,jo)= -ts
                 endif
-                if(ilat>1)then !Avoid x lower outbound
-                   ind2=indices2N([ilat-1,jlat])
-                   hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb)= -ts
+                if(ix>1)then !Avoid x lower outbound
+                   jlat = indices2N([ix-1,iy])
+                   jo   = iorb + (jlat-1)*Norb
+                   hopping_matrix(ispin,ispin,io,jo)= -ts
                 endif
-                if(jlat<Ny)then !Avoid y higher outbound
-                   ind2=indices2N([ilat,jlat+1])
-                   hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb)= -ts
+                if(iy<Ny)then !Avoid y higher outbound
+                   jlat = indices2N([ix,iy+1])
+                   jo   = iorb + (jlat-1)*Norb
+                   hopping_matrix(ispin,ispin,io,jo)= -ts
                 endif
-                if(jlat>1)then !Avoid y lower outbound
-                   ind2=indices2N([ilat,jlat-1])
-                   hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb)= -ts
+                if(iy>1)then !Avoid y lower outbound
+                   jlat = indices2N([ix,iy-1])
+                   jo   = iorb + (jlat-1)*Norb
+                   hopping_matrix(ispin,ispin,io,jo)= -ts
                 endif
              enddo
           enddo
           !
        enddo
     enddo
-    !
-    Hloc=nnn2lso(hopping_matrix)
+    !    
+    Hloc=nn2so(hopping_matrix)
     !
   end function hloc_model
-  !
-  !
+
+
+
   !> Hk = H_{hop_inter_cluster} + Hloc
   function hk_model(kpoint,N) result(hk)
-    integer                                               :: N,ilat,ispin,iorb,ind1,ind2
-    real(8),dimension(:)                                  :: kpoint
-    real(8)                                               :: kx,ky
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb) :: hopping_matrix
-    complex(8),dimension(N,N)                             :: Hk
+    integer                                     :: N,ix,iy,ispin,iorb,ilat,jlat,io,jo
+    real(8),dimension(:)                        :: kpoint
+    real(8)                                     :: kx,ky
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: hopping_matrix
+    complex(8),dimension(N,N)                   :: Hk
     !
     hopping_matrix=zero
     kx=kpoint(1)
@@ -284,25 +303,34 @@ contains
     do ispin=1,Nspin
        do iorb=1,Norb
           !
-          do ilat=1,Nx                  !Supercell bravais vector along y
-             ind1=indices2N([ilat,1])
-             ind2=indices2N([ilat,Ny])
-             hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb)=hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb) - ts*exp(xi*ky*Ny)
-             hopping_matrix(ind2,ind1,ispin,ispin,iorb,iorb)=hopping_matrix(ind2,ind1,ispin,ispin,iorb,iorb) - ts*exp(-xi*ky*Ny)
+          do ix=1,Nx                  !Supercell bravais vector along y
+             ilat = indices2N([ix,1])
+             jlat = indices2N([ix,Ny])
+             io   = iorb + (ilat-1)*Norb
+             jo   = iorb + (jlat-1)*Norb
+             hopping_matrix(ispin,ispin,io,jo)=hopping_matrix(ispin,ispin,io,jo) - ts*exp(xi*ky*Ny)
+             hopping_matrix(ispin,ispin,jo,io)=hopping_matrix(ispin,ispin,jo,io) - ts*exp(-xi*ky*Ny)
           enddo
           !
-          do ilat=1,Ny                  !Supercell bravais vector along x
-             ind1=indices2N([1,ilat])
-             ind2=indices2N([Nx,ilat])
-             hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb)=hopping_matrix(ind1,ind2,ispin,ispin,iorb,iorb) - ts*exp(xi*kx*Nx)
-             hopping_matrix(ind2,ind1,ispin,ispin,iorb,iorb)=hopping_matrix(ind2,ind1,ispin,ispin,iorb,iorb) - ts*exp(-xi*kx*Nx)
+          do iy=1,Ny                  !Supercell bravais vector along x
+             ilat = indices2N([1,iy])
+             jlat = indices2N([Nx,iy])
+             io   = iorb + (ilat-1)*Norb
+             jo   = iorb + (jlat-1)*Norb
+             hopping_matrix(ispin,ispin,io,jo)=hopping_matrix(ispin,ispin,io,jo) - ts*exp(xi*kx*Nx)
+             hopping_matrix(ispin,ispin,io,jo)=hopping_matrix(ispin,ispin,io,jo) - ts*exp(-xi*kx*Nx)
           enddo
           !
        enddo
     enddo
     !
-    Hk=nnn2lso(hopping_matrix)+hloc_model(N)
+    Hk=nn2so(hopping_matrix)+hloc_model(N)
+    !
   end function hk_model
+
+
+
+
 
 
   !-------------------------------------------------------------------------------------------
@@ -311,18 +339,18 @@ contains
   !             3 |    007 008 009
   !             2 |    004 005 006
   !             1 |    001 002 003
-  !             0 |___ ___ ___ ___ ___ >
-  !                 0   1   2   3   4  x
+  !             0 |___ ___ ___ ___ _ >
+  !                 0   1   2   3  x
   !-------------------------------------------------------------------------------------------
   function indices2N(indices) result(N)
     integer,dimension(2)         :: indices
-    integer                      :: N,i
+    integer                      :: N
     !
-    N=Nx*(indices(2)-1)+indices(1)
+    N = indices(1) + (indices(2)-1)*Nx
     !
   end function indices2N
-  !
-  !
+
+
   function N2indices(N) result(indices)
     integer,dimension(2)         :: indices
     integer                      :: N,i
@@ -336,6 +364,8 @@ contains
     endif
     !
   end function N2indices
+
+
 
 
   !-------------------------------------------------------------------------------------------
@@ -363,68 +393,20 @@ contains
     if(allocated(hloc))deallocate(Hloc)
     !
     allocate(Hk(Nlso,Nlso,Nkx*Nky),Hloc(Nlso,Nlso))
-    hk=zero
-    hloc=zero
+    hk   = zero
+    hloc = zero
     !
     call TB_build_model(Hk,hk_model,Nlso,kgrid)
-    Hloc=hloc_model(Nlso)
-    where(abs(dreal(Hloc))<1.d-9)Hloc=0d0
+    Hloc = hloc_model(Nlso)
+    where(abs(dreal(Hloc))<1d-9)Hloc=0d0
     !
   end subroutine generate_hk_hloc
 
-  !-------------------------------------------------------------------------------------------
-  !PURPOSE: auxiliary reshape functions
-  !-------------------------------------------------------------------------------------------
-  function lso2nnn(Hlso) result(Hnnn)
-    complex(8),dimension(Nlat*Nspin*Norb,Nlat*Nspin*Norb) :: Hlso
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb) :: Hnnn
-    integer                                               :: ilat,jlat
-    integer                                               :: iorb,jorb
-    integer                                               :: ispin,jspin
-    integer                                               :: is,js
-    Hnnn=zero
-    do ilat=1,Nlat
-       do jlat=1,Nlat
-          do ispin=1,Nspin
-             do jspin=1,Nspin
-                do iorb=1,Norb
-                   do jorb=1,Norb
-                      is = iorb + (ilat-1)*Norb + (ispin-1)*Norb*Nlat
-                      js = jorb + (jlat-1)*Norb + (jspin-1)*Norb*Nlat
-                      Hnnn(ilat,jlat,ispin,jspin,iorb,jorb) = Hlso(is,js)
-                   enddo
-                enddo
-             enddo
-          enddo
-       enddo
-    enddo
-  end function lso2nnn
-  !
-  !
-  function nnn2lso(Hnnn) result(Hlso)
-    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb) :: Hnnn
-    complex(8),dimension(Nlat*Nspin*Norb,Nlat*Nspin*Norb) :: Hlso
-    integer                                               :: ilat,jlat
-    integer                                               :: iorb,jorb
-    integer                                               :: ispin,jspin
-    integer                                               :: is,js
-    Hlso=zero
-    do ilat=1,Nlat
-       do jlat=1,Nlat
-          do ispin=1,Nspin
-             do jspin=1,Nspin
-                do iorb=1,Norb
-                   do jorb=1,Norb
-                      is = iorb + (ilat-1)*Norb + (ispin-1)*Norb*Nlat
-                      js = jorb + (jlat-1)*Norb + (jspin-1)*Norb*Nlat
-                      Hlso(is,js) = Hnnn(ilat,jlat,ispin,jspin,iorb,jorb)
-                   enddo
-                enddo
-             enddo
-          enddo
-       enddo
-    enddo
-  end function nnn2lso
+
+
+
+
+
 
   !-------------------------------------------------------------------------------------------
   !PURPOSE: explicitate the cluster-indices convention in LOG files
@@ -447,6 +429,9 @@ contains
     write(LOGfile,"(A)")" "
   end subroutine naming_convention
 
+
+
+  
   !+---------------------------------------------------------------------------+
   !PURPOSE : check the local-dm comparing to Eq.4 in Mod.Phys.Lett.B.2013.27:05
   !+---------------------------------------------------------------------------+
@@ -474,6 +459,28 @@ contains
   end subroutine one_orb_benchmark
 
 
+
+  function nn2so(In) result(Out)
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: In
+    complex(8),dimension(Nspin*Nimp,Nspin*Nimp) :: Out
+    integer :: is,js,i,j,io,jo
+    do concurrent(is=1:Nspin,js=1:Nspin,i=1:Nimp,j=1:Nimp)
+       io = i + (is-1)*Nimp
+       jo = j + (js-1)*Nimp
+       Out(io,jo) = In(is,js,i,j)
+    enddo
+  end function nn2so
+
+  function so2nn(In) result(Out)
+    complex(8),dimension(Nspin*Nimp,Nspin*Nimp) :: In
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: Out
+    integer :: is,js,i,j,io,jo
+    do concurrent(is=1:Nspin,js=1:Nspin,i=1:Nimp,j=1:Nimp)
+       io = i + (is-1)*Nimp
+       jo = j + (js-1)*Nimp
+       Out(is,js,i,j) = In(io,jo)
+    enddo
+  end function so2nn
 
 end program cdn_hm_2dsquare
 

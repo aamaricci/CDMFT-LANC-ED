@@ -2,12 +2,13 @@ MODULE ED_SETUP
   !
   !Contains procedures to set up the Exact Diagonalization calculation, executing all internal consistency checks and allocation of the global memory.
   !
-  USE ED_INPUT_VARS
-  USE ED_VARS_GLOBAL
-  USE ED_AUX_FUNX
   USE SF_TIMER
   USE SF_IOTOOLS, only: free_unit,reg,file_length
   USE SF_MISC,    only: assert_shape
+  USE ED_INPUT_VARS
+  USE ED_VARS_GLOBAL
+  USE ED_AUX_FUNX
+  USE ED_SECTOR
 #ifdef _MPI
   USE MPI
   USE SF_MPI

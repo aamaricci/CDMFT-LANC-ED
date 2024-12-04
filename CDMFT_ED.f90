@@ -2,6 +2,7 @@ MODULE CDMFT_ED
   USE ED_INPUT_VARS
 
   USE ED_AUX_FUNX, only:                                       &
+       ed_set_hloc                                           , &
        ed_search_variable                                    , &
        search_chemical_potential
 
