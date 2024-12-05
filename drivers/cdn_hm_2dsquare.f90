@@ -90,30 +90,36 @@ program cdn_hm_2dsquare
 
 
   !Build Hsym_basis and lambdasym_vectors
-  Nsym = 2
+  !This trick is introduced in the case Hloc==zero ==> single site case
+  Nsym = 1;if(any(abs(Hloc)/=zero))Nsym=2
+
   allocate(lambdasym_vectors(Nbath,Nsym))
   allocate(Hsym_basis(Nspin*Nimp,Nspin*Nimp,Nsym))
-
-  print*,size(Hsym_basis,1),size(Hsym_basis,2),Nspin*Nimp
 
   !Replica onsite energies
   Hsym_basis(:,:,1) = zeye(Nspin*Nimp)
   !Replica hopping amplitudes
-  Hsym_basis(:,:,2) = abs(Hloc)
+  if(Nsym==2)Hsym_basis(:,:,2) = abs(Hloc)
   !
   write(LOGfile,*) "HWBAND="//str(ed_hw_band)
   do irepl=1,Nbath
      onsite = irepl - 1 - (Nbath-1)/2d0        ![-(Nbath-1)/2:(Nbath-1)/2]
      onsite = onsite * 2*ed_hw_band/(Nbath-1)  !P-H symmetric band, -HWBAND:HWBAND
      lambdasym_vectors(irepl,1) = onsite       !Multiplies the suitable identity
-     lambdasym_vectors(irepl,2) = 1d0+noise(0.1d0)           !Recall that TS is contained in Hloc
   enddo
   if(mod(Nbath,2)==0)then
      lambdasym_vectors(Nbath/2,1)   = -1d-1    !Much needed small energies around
      lambdasym_vectors(Nbath/2+1,1) =  1d-1    !the fermi level. (for even Nbath)
   endif
+  !
+  if(Nsym==2)then
+     do irepl=1,Nbath
+        lambdasym_vectors(irepl,2) = 1d0+noise(0.01d0)           !Recall that TS is contained in Hloc
+     enddo
+  endif
 
 
+  
   !SETUP Hloc
   call ed_set_hloc(Hloc)
 
@@ -130,7 +136,7 @@ program cdn_hm_2dsquare
 
   allocate(bath_prev(Nb))
   bath_prev=zero
-  
+
   !DMFT loop
   iloop=0;converged=.false.
   do while(.not.converged.AND.iloop<nloop)
@@ -251,7 +257,7 @@ contains
     r = r*W
   end function noise
 
-  
+
   !-------------------------------------------------------------------------------------------
   !PURPOSE:  Hk model for the 2d square lattice
   !-------------------------------------------------------------------------------------------

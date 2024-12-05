@@ -776,13 +776,10 @@ contains
     integer                             :: isector
     integer,dimension(:)                :: order
     type(sector)                        :: sectorH
-    type(sector_map),dimension(2*Ns_Ud) :: H
     integer,dimension(2*Ns_Ud)          :: Indices,Istates
-    integer,dimension(Ns_Ud)            :: DimUps,DimDws
-    integer                             :: Dim
     integer                             :: i,iud
     !
-    if(size(Order)/=Dim)stop "twin_sector_order error: wrong dimensions of *order* array"
+    if(size(Order)/=GetDim(isector))stop "twin_sector_order error: wrong dimensions of *order* array"
     !
     call build_sector(isector,sectorH)
     select case(ed_mode)

@@ -53,10 +53,10 @@ function delta_replica_superc(a) result(Delta)
   real(8),dimension(Nbath,Nlambdas)                       :: Lk
   complex(8)                                              :: iw
   !
-  stride = 1
+  stride = 0
   do ibath=1,Nbath
      !Get Vs
-     Vk(ibath)   = a(stride)
+     Vk(ibath)   = a(stride+1)
      stride      = stride + 1
      !Get Lambdas
      Lk(ibath,:) = a(stride+1:stride+Nlambdas)
@@ -99,9 +99,9 @@ function grad_delta_replica_normal(a) result(dDelta)
   dDelta=zero
   !
   !Get Hs
-  stride = 1
+  stride = 0
   do ibath=1,Nbath
-     Vk(ibath)  = a(stride)
+     Vk(ibath)  = a(stride+1)
      stride     = stride + 1
      Lk(ibath,:)= a(stride+1:stride+Nlambdas)
      stride     = stride + Nlambdas
