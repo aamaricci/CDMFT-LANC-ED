@@ -102,7 +102,7 @@ program cdn_hm_2dsquare
      onsite = irepl - 1 - (Nbath-1)/2d0      ![-(Nbath-1)/2:(Nbath-1)/2]
      onsite = onsite * 2*HWBAND/(Nbath-1)    !P-H symmetric band, -HWBAND:HWBAND
      lambdasym_vectors(irepl,1) = onsite     !Multiplies the suitable identity
-     if(Nsym==2)lambdasym_vectors(irepl,2) = 1d0        !Recall that TS is contained in Hloc
+     if(Nsym==2)lambdasym_vectors(irepl,Nsym) = 1d0        !Recall that TS is contained in Hloc
   enddo
   if(mod(Nbath,2)==0)then
      lambdasym_vectors(Nbath/2,1) = -1d-1    !Much needed small energies around
@@ -117,6 +117,8 @@ program cdn_hm_2dsquare
   bath_prev=zero
   call ed_init_solver(comm,bath)
 
+  print*,bath
+  
   !DMFT loop
   iloop=0;converged=.false.
   do while(.not.converged.AND.iloop<nloop)
@@ -170,7 +172,7 @@ program cdn_hm_2dsquare
      bath_prev=bath
      !
      !Check convergence (if required change chemical potential)
-     converged = check_convergence(Weiss(:,:,1,1,1,1,:),dmft_error,nsuccess,nloop)
+     converged = check_convergence(Weiss(1,1,1,1,1,1,:),dmft_error,nsuccess,nloop)
      if(nread/=0.d0)then
         allocate(dens_mats(Nlat))
         allocate(dens_ed(Nlat,Norb))
