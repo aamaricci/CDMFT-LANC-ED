@@ -201,22 +201,22 @@ contains
   !PURPOSE  : Setup Himpurity, the local part of the non-interacting Hamiltonian
   !+------------------------------------------------------------------+
   subroutine ed_set_Hloc_single_N2(hloc)
-    complex(8),dimension(Nspin*Nimp,Nspin*Nimp),intent(in) :: hloc ![Nspin*Nimp,Nspin*Nimp]
+    complex(8),dimension(Nspin*Nlat*Norb,Nspin*Nlat*Norb),intent(in) :: hloc ![Nspin*Nimp,Nspin*Nimp]
     !
     if(allocated(impHloc))deallocate(impHloc)
-    allocate(impHloc(Nspin,Nspin,Nimp,Nimp));impHloc=zero
+    allocate(impHloc(Nspin,Nspin,Nlat*Norb,Nlat*Norb));impHloc=zero
     !
-    impHloc = so2nn_reshape(Hloc,Nspin,Nimp)
+    impHloc = so2nn_reshape(Hloc,Nspin,Nlat*Norb)
     !
     if(ed_verbose>2)call print_hloc(impHloc)
     !
   end subroutine ed_set_Hloc_single_N2
 
   subroutine ed_set_Hloc_single_N4(hloc)
-    complex(8),dimension(Nspin,Nspin,Nimp,Nimp),intent(in) :: hloc
+    complex(8),dimension(Nspin,Nspin,Nlat*Norb,Nlat*Norb),intent(in) :: hloc
     !
     if(allocated(impHloc))deallocate(impHloc)
-    allocate(impHloc(Nspin,Nspin,Nimp,Nimp));impHloc=zero
+    allocate(impHloc(Nspin,Nspin,Nlat*Norb,Nlat*Norb));impHloc=zero
     !
     impHloc = Hloc
     !
@@ -228,7 +228,7 @@ contains
     complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb),intent(in) :: hloc
     !
     if(allocated(impHloc))deallocate(impHloc)
-    allocate(impHloc(Nspin,Nspin,Nimp,Nimp));impHloc=zero
+    allocate(impHloc(Nspin,Nspin,Nlat*Norb,Nlat*Norb));impHloc=zero
     !
     do concurrent(ilat=1:Nlat,jlat=1:Nlat,ispin=1:Nspin,jspin=1:Nspin,iorb=1:Norb,jorb=1:Norb)
        is = iorb + (ilat-1)*Norb
@@ -1501,30 +1501,36 @@ contains
     if(present(file))then
        open(free_unit(unit),file=reg(file))
        write(LOGfile,"(A)")"print_Hloc to file :"//reg(file)
+    else
+       write(LOGfile,"(A)")"print_Hloc to LOG  :"
     endif
-    !
+       !
     do is=1,Nlat*Nspin*Norb
        write(unit,"(20(A1,F8.4,A1,F8.4,A1,2x))")('(',dreal(Hloc(is,js)),',',dimag(Hloc(is,js)),')',js =1,Nlat*Nspin*Norb)
     enddo
     write(unit,*)""
+    !
     if(present(file))close(unit)
+    !
   end subroutine print_Hloc_d2
 
   subroutine print_Hloc_d4(hloc,file)
-    complex(8),dimension(Nspin,Nspin,Nimp,Nimp) :: hloc
-    character(len=*),optional                   :: file
-    integer                                     :: ilat,jlat,iorb,jorb,ispin,jspin,io,jo
-    integer                                     :: unit
+    complex(8),dimension(Nspin,Nspin,Nlat*Norb,Nlat*Norb) :: hloc
+    character(len=*),optional                             :: file
+    integer                                               :: ilat,jlat,iorb,jorb,ispin,jspin,io,jo
+    integer                                               :: unit
     !
     unit=LOGfile
     if(present(file))then
        open(free_unit(unit),file=reg(file))
        write(LOGfile,"(A)")"print_Hloc to file :"//reg(file)
+    else
+       write(LOGfile,"(A)")"print_Hloc to LOG  :"
     endif
     do ispin=1,Nspin
-       do iorb=1,Nimp
+       do iorb=1,Nlat*Norb
           write(unit,"(100(A1,F8.4,A1,F8.4,A1,2x))")&
-               (('(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',jorb =1,Nimp),jspin=1,Nspin)
+               (('(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',jorb =1,Nlat*Norb),jspin=1,Nspin)
        enddo
     enddo
     write(unit,*)""

@@ -118,16 +118,14 @@ program cdn_hm_2dsquare
      enddo
   endif
 
-
-  
-  !SETUP Hloc
-  call ed_set_hloc(Hloc)
-
-
-
   !SETUP BATH
   call ed_set_Hbath(Hsym_basis,lambdasym_vectors)
   Nb=ed_get_bath_dimension(Nsym)
+
+
+  !SETUP Hloc
+  call ed_set_hloc(Hloc)
+  call print_matrix(Hloc)
 
   !SETUP SOLVER
   allocate(bath(Nb))
@@ -341,7 +339,7 @@ contains
              io   = iorb + (ilat-1)*Norb
              jo   = iorb + (jlat-1)*Norb
              hopping_matrix(ispin,ispin,io,jo)=hopping_matrix(ispin,ispin,io,jo) - ts*exp(xi*kx*Nx)
-             hopping_matrix(ispin,ispin,io,jo)=hopping_matrix(ispin,ispin,io,jo) - ts*exp(-xi*kx*Nx)
+             hopping_matrix(ispin,ispin,jo,io)=hopping_matrix(ispin,ispin,jo,io) - ts*exp(-xi*kx*Nx)
           enddo
           !
        enddo

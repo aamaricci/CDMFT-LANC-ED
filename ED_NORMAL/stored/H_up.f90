@@ -2,13 +2,12 @@
      mup = Hsector%H(1)%map(jup)
      Nup = bdecomp(mup,Ns)
      !
-     !
      !> H_imp: Off-diagonal elements, i.e. non-local part. 
      !remark: iorb=jorb + ilat=jlat cant have simultaneously n=0 and n=1 (Jcondition)
      do iorb=1,Nimp
         do jorb=1,Nimp
-           Jcondition = (impHloc(1,1,iorb,jorb)/=zero)&
-                .AND.(ibup(jorb)==1).AND.(ibup(iorb)==0)
+           Jcondition = (impHloc(1,1,iorb,jorb)/=zero) &
+                .AND.(Nup(jorb)==1).AND.(Nup(iorb)==0)
            if (Jcondition) then
               call c(jorb,mup,k1,sg1)
               call cdg(iorb,k1,k2,sg2)

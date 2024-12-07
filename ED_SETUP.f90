@@ -191,10 +191,11 @@ contains
        niter=nloop/3
     endif
 
-    !ALLOCATE impHloc
-    if(allocated(impHloc))deallocate(impHloc)
-    allocate(impHloc(Nspin,Nspin,Nimp,Nimp))
-    impHloc=zero
+    !ALLOCATE impHloc if not allocated already (set Hloc)
+    if(.not.allocated(impHloc))then
+       allocate(impHloc(Nspin,Nspin,Nimp,Nimp))
+       impHloc=zero
+    endif
     !
     !
     !allocate functions
@@ -397,7 +398,7 @@ contains
     stride=Nimp
     do ibath=1,Nbath
        do iorb=1,Nimp
-          getBathStride(iorb,ibath) = Nimp +  (ibath-1)*Nimp + iorb !==ibath*Nimp + iorb
+          getBathStride(iorb,ibath) = Nimp + iorb + (ibath-1)*Nimp !==ibath*Nimp + iorb
        enddo
     enddo
     !

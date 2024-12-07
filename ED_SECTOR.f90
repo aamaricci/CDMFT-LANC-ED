@@ -308,13 +308,13 @@ contains
        if(ed_verbose>2)then
           select case(ed_mode)
           case default
-             write(LOGfile,"(2(A,I6,2I4))")&
+             write(LOGfile,"(A,I6,2I4,A,I6,2I4)")&
                   'From:',sectorI%index,sectorI%Nups,sectorI%Ndws,&
-                  ' -> apply C:',sectorJ%index,sectorJ%Nups,sectorJ%Ndws
+                  ' -> apply C  :',sectorJ%index,sectorJ%Nups,sectorJ%Ndws
           case ("superc")
-             write(LOGfile,"(2(A,I6,I3))")&
+             write(LOGfile,"(A,I6,I3,A,I6,I3)")&
                   'From:',sectorI%index,sectorI%Sz,&
-                  'apply C:',sectorJ%index,sectorJ%Sz
+                  'apply C  :',sectorJ%index,sectorJ%Sz
           end select
        endif
        !
@@ -379,11 +379,11 @@ contains
        if(ed_verbose>2)then
           select case(ed_mode)
           case default
-             write(LOGfile,"(2(A,I6,2I4))")&
+             write(LOGfile,"(A,I6,2I4,A,I6,2I4)")&
                   'From:',sectorI%index,sectorI%Nups,sectorI%Ndws,&
                   ' -> apply C^+:',sectorJ%index,sectorJ%Nups,sectorJ%Ndws
           case ("superc")
-             write(LOGfile,"(2(A,I6,I3))")&
+             write(LOGfile,"(A,I6,I3,A,I6,I3)")&
                   'From:',sectorI%index,sectorI%Sz,&
                   'apply C^+:',sectorJ%index,sectorJ%Sz
           end select
@@ -434,7 +434,7 @@ contains
     type(sector)                           :: sectorJ
     complex(8),dimension(:),allocatable    :: OV
     integer                                :: ipos,ispin,ios
-    integer                                :: i,j,Nos,is
+    integer                                :: i,j,Nos,is,N
     real(8)                                :: sgn
     integer                                :: r
     integer                                :: fi
@@ -443,7 +443,8 @@ contains
     integer,dimension(2,Ns_Orb)            :: Nud !Nbits(Ns_Orb)
     integer,dimension(2)                   :: Iud
     integer,dimension(2*Ns)                :: ib
-    character(3),dimension(-1:1)           :: Cstr = ["C  "," x ","C^+"]
+    character(2),dimension(-1:1)           :: Cstr = ["C ","  ","C*"]
+    character(:),allocatable               :: a,sg,Ostr
     !
     if(MpiMaster)then
        !
@@ -455,15 +456,58 @@ contains
        allocate(OV(sectorJ%Dim)) ; OV=zero
        !
        if(ed_verbose>2)then
+          Ostr = ""
+          do is=1,size(As)
+             ipos  = Pos(is)
+             ispin = Spin(is)
+             ios   = Os(is)
+             sg = "";if(is>1)sg=" + "
+             a  = str(As(is),2)
+             if(As(is)==one)then
+                a=""
+                if(is>1)sg = " + "
+             endif
+             if(As(is)==-one)then
+                a=""
+                sg = " - "
+             endif
+             if(As(is)==xi)then
+                a="i."
+                if(is>1)sg = " + "
+             endif
+             if(As(is)==-xi)then
+                a="i."
+                sg = " - "
+             endif
+             if(As(is)==one+xi)then
+                a="(1+i)."
+                if(is>1)sg = " + "
+             endif
+             if(As(is)==-one+xi)then
+                a="(-1+i)."
+                sg = " + "
+             endif
+             if(As(is)==one-xi)then
+                a="(1-i)."
+                if(is>1)sg = " + "
+             endif
+             if(As(is)==-one-xi)then
+                a="(1+i)."
+                sg = " - "
+             endif
+             Ostr  = Ostr//sg//a//str(Cstr(ios))//"_l"//str(ipos)//"s"//str(ispin)
+          enddo
+          N = max(20,len(Ostr))
+          !
           select case(ed_mode)
           case default
-             write(LOGfile,"(2(A,I6,2I4))")&
+             write(LOGfile,"(A,I6,2I4,A,A"//str(N)//",I6,2I4)")&
                   'From:',sectorI%index,sectorI%Nups,sectorI%Ndws,&
-                  ' -> apply C:',sectorI%index,sectorJ%Nups,sectorJ%Ndws
+                  ' -> apply:',Ostr,sectorI%index,sectorJ%Nups,sectorJ%Ndws
           case ("superc")
-             write(LOGfile,"(2(A,I6,I3))")&
+             write(LOGfile,"(A,I6,I3,A,A"//str(N)//",I6,I3))")&
                   'From:',sectorI%index,sectorI%Sz,&
-                  'apply C:',sectorI%index,sectorJ%Sz
+                  ' -> apply:',Ostr,sectorI%index,sectorJ%Sz
           end select
        endif
 
@@ -471,9 +515,6 @@ contains
           ipos  = Pos(is)
           ispin = Spin(is)
           ios   = Os(is)
-          if(ed_verbose>2)write(LOGfile,"(A)")&
-               'apply '//str(Cstr(ios))//" l:"//str(ipos)//" s:"//str(ispin)
-          !
           do i=1,sectorI%Dim
              select case(ed_mode)
              case default
