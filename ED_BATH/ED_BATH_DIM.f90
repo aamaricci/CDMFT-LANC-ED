@@ -71,19 +71,21 @@ contains
        stop "ERROR get_bath_dimension_symmetris wiht bath_type!=replica/general"
     end select
     !
+    !Number of lamba parameters: \lambda
     ndx = Nsym
+    !
+    !diagonal hybridizations: Vs
+    select case(bath_type)
+    case("replica")
+       ndx = ndx + 1
+    case("general")
+       ndx = ndx + (Norb*Nlat)*Nspin
+    end select
     !
     !number of replicas
     ndx = ndx * Nbath
-    !diagonal hybridizations: Vs
-    ! select case(bath_type)
-    ! case("replica")
-    !    ndx = ndx + Nbath
-    ! case("general")
-    ndx = ndx + Nbath*(Norb*Nlat)*Nspin
-    ! end select
     !
-    !we also store Nsym itself
+    !+1 as we also store Nsym itself
     ndx = ndx+1
     !
     bath_size = ndx

@@ -31,6 +31,11 @@ contains
   subroutine chi2_fitgf_normal(fg,bath)
     complex(8),dimension(:,:,:,:,:)    :: fg ![Nspin,Nspin,Nimp,Nimp][Lmats]
     real(8),dimension(:),intent(inout) :: bath
+    integer                            :: L
+    !
+#ifdef _MPI    
+    if(check_MPI())call ed_set_MpiComm()
+#endif
     !
     select case(cg_method)
     case default;stop "ED Error: cg_method > 1"
@@ -38,14 +43,31 @@ contains
     case (1);if(ed_verbose>2)write(LOGfile,"(A,I1,A,A)")"\Chi2 fit: CG-minimize, CG-weight: ",cg_weight," on: ",cg_scheme
     end select
     !
-    select case(bath_type)
-    case('replica');call chi2_fitgf_replica(fg,bath)
-    case('general');call chi2_fitgf_general(fg,bath)
-    end select
+    if(MpiMaster)then
+       !
+       L = size(fg,5)
+       call assert_shape(fg,[Nspin,Nspin,Nimp,Nimp,L],"chi2_fitgf_normal","fg")
+       !
+       select case(bath_type)
+       case('replica');call chi2_fitgf_replica(fg,bath)
+       case('general');call chi2_fitgf_general(fg,bath)
+       end select
+    end if
     !
-    !set trim_state_list to true after the first fit has been done: this
+#ifdef _MPI
+    if(MpiStatus)then
+       call Bcast_MPI(MpiComm,bath)
+       if(.not.MpiMaster)write(LOGfile,"(A)")"Bath received from master node"
+    endif
+#endif
+    !
+    !set trim_state_list to true after the first fit has been done: this 
     !marks the ends of the cycle of the 1st DMFT loop.
     trim_state_list=.true.
+    !DELETE THE LOCAL MPI COMMUNICATOR:
+#ifdef _MPI    
+    if(check_MPI())call ed_del_MpiComm()
+#endif   
     !
   end subroutine chi2_fitgf_normal
 
@@ -55,22 +77,43 @@ contains
     complex(8),dimension(:,:,:,:,:)    :: fg ![Nspin,Nspin,Nimp,Nimp][Lmats]
     complex(8),dimension(:,:,:,:,:)    :: ff ![Nspin,Nspin,Nimp,Nimp][Lmats]
     real(8),dimension(:),intent(inout) :: bath
+    integer                            :: L
+    !
+#ifdef _MPI    
+    if(check_MPI())call ed_set_MpiComm()
+#endif
     !
     select case(cg_method)
     case default;stop "ED Error: cg_method > 1"
     case (0);if(ed_verbose>2)write(LOGfile,"(A,I1,A,A)")"\Chi2 fit: CG-nr, CG-weight: ",cg_weight," on: ",cg_scheme
     case (1);if(ed_verbose>2)write(LOGfile,"(A,I1,A,A)")"\Chi2 fit: CG-minimize, CG-weight: ",cg_weight," on: ",cg_scheme
     end select
+    if(MpiMaster)then
+       !
+       L = size(fg,5)
+       call assert_shape(fg,[Nspin,Nspin,Nimp,Nimp,L],"chi2_fitgf_superc","fg")
+       call assert_shape(ff,[Nspin,Nspin,Nimp,Nimp,L],"chi2_fitgf_superc","ff")
+       !
+       select case(bath_type)
+       case('replica');call chi2_fitgf_replica(fg,ff,bath)
+       case('general');call chi2_fitgf_general(fg,ff,bath)
+       end select
+    end if
     !
-    select case(bath_type)
-    case('replica');call chi2_fitgf_replica(fg,bath)
-    case('general');call chi2_fitgf_general(fg,bath)
-    end select
+#ifdef _MPI
+    if(MpiStatus)then
+       call Bcast_MPI(MpiComm,bath)
+       if(.not.MpiMaster)write(LOGfile,"(A)")"Bath received from master node"
+    endif
+#endif
     !
-    !set trim_state_list to true after the first fit has been done: this
+    !set trim_state_list to true after the first fit has been done: this 
     !marks the ends of the cycle of the 1st DMFT loop.
     trim_state_list=.true.
-    !
+    !DELETE THE LOCAL MPI COMMUNICATOR:
+#ifdef _MPI    
+    if(check_MPI())call ed_del_MpiComm()
+#endif   
   end subroutine chi2_fitgf_superc
 
 

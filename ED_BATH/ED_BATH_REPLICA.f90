@@ -94,6 +94,18 @@ contains
   end subroutine deallocate_Hbath
 
 
+  !print Hbath components
+  subroutine print_Hbath()
+    if(.not.Hbath_status)stop "ERROR print_Hbath: Hbath not allocated."
+    if(all(Hbath_lambda==0d0))stop "ERROR print_Hbath: Hbath_lambda not set."
+    if(ed_verbose>2)then
+       do ibath=1,Nbath
+          write(LOGfile,*) "Hbath #"//str(ibath)//":"
+          call print_hloc(Hbath_build(Hbath_lambda(ibath,:)))
+       enddo
+    endif
+  end subroutine print_Hbath
+
 
 
 
@@ -102,6 +114,7 @@ contains
   !##################################################################
   !##################################################################
 
+  
 
   function Hbath_build(lambdavec) result(H)
     !
@@ -168,12 +181,7 @@ contains
        enddo
     end select
     !  
-    if(ed_verbose>2)then
-       do ibath=1,Nbath
-          write(*,*) "Hbath #"//str(ibath)//":"
-          call print_hloc(Hbath_build(Hbath_lambda(ibath,:)))
-       enddo
-    endif
+    call print_hbath()
     !
   end subroutine init_Hbath_symmetries_d7
 
@@ -205,12 +213,7 @@ contains
        stop "init_Hbath_symmetries_d5 ERROR: called with ed_mode=superc but shape(Hvec)=[Nspin,Nspin,Nimp,Nimp]"
     end select
     !  
-    if(ed_verbose>2)then
-       do ibath=1,Nbath
-          write(*,*) "Hbath #"//str(ibath)//":"
-          call print_hloc(Hbath_build(Hbath_lambda(ibath,:)))
-       enddo
-    endif
+    call print_hbath()
     !
   end subroutine init_Hbath_symmetries_d5
 
@@ -250,12 +253,7 @@ contains
        enddo
     end select
     !
-    if(ed_verbose>2)then
-       do ibath=1,Nbath
-          write(*,*) "Hbath #"//str(ibath)//":"
-          call print_hloc(Hbath_build(Hbath_lambda(ibath,:)))
-       enddo
-    endif
+    call print_hbath()
     !
   end subroutine init_Hbath_symmetries_d3
 
@@ -303,14 +301,14 @@ contains
     write(*,*) "         >>> This back-compatibility patch might be removed in a future update."
     write(*,*) "                                                                               "
     !
-    if(ed_verbose>2)then
-       do ibath=1,Nbath
-          write(*,*) "Hbath #"//str(ibath)//":"
-          call print_hloc(Hbath_build(Hbath_lambda(ibath,:)))
-       enddo
-    endif
+    call print_hbath()
     !
   end subroutine init_Hbath_symmetries_LEGACY
+
+
+
+
+
 
 
 

@@ -301,9 +301,11 @@ contains
     file_=str(str(Hfile)//str(ed_file_suffix)//str(extension))
     if(present(file))file_=str(file)
     unit_=free_unit()
-    open(unit_,file=str(file_))
-    call write_dmft_bath(dmft_bath_,unit_)
-    close(unit_)
+    if(MpiMaster)then
+       open(unit_,file=str(file_))
+       call write_dmft_bath(dmft_bath_,unit_)
+       close(unit_)
+    endif
   end subroutine save_dmft_bath
 
 

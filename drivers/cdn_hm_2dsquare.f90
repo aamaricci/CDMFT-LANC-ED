@@ -21,7 +21,7 @@ program cdn_hm_2dsquare
   complex(8),allocatable,dimension(:,:,:,:,:) :: Greal
   complex(8),allocatable,dimension(:,:,:,:,:) :: Smats
   complex(8),allocatable,dimension(:,:,:,:,:) :: Sreal
-  complex(8),allocatable,dimension(:,:,:,:,:) :: Weiss
+  complex(8),allocatable,dimension(:,:,:,:,:) :: Weiss,Wprev
   !freq array:
   complex(8),allocatable                      :: Hk(:,:,:)
   complex(8),allocatable                      :: Sigma(:,:,:)
@@ -32,6 +32,7 @@ program cdn_hm_2dsquare
   real(8),dimension(:,:),allocatable          :: lambdasym_vectors
   complex(8),dimension(:,:,:),allocatable     :: Hsym_basis
   character(len=64)                           :: finput,foutput
+  character(len=1)                            :: fmixing
   !MPI VARIABLES (local use -> ED code has its own set of MPI variables)
   integer                                     :: comm
   integer                                     :: rank
@@ -45,12 +46,13 @@ program cdn_hm_2dsquare
   !  
   !Parse input variables
   call parse_cmd_variable(finput,"FINPUT",default='inputHM2D.conf')
-  call parse_input_variable(wmixing,"wmixing",finput,default=1.d0,comment="Mixing bath parameter")
   call parse_input_variable(ts,"TS",finput,default=0.25d0,comment="hopping parameter")
   call parse_input_variable(Nx,"Nx",finput,default=2,comment="Number of cluster sites in x direction")
   call parse_input_variable(Ny,"Ny",finput,default=2,comment="Number of cluster sites in y direction")
   call parse_input_variable(Nkx,"Nkx",finput,default=100,comment="Number of kx point for BZ integration")
   call parse_input_variable(Nky,"Nky",finput,default=100,comment="Number of ky point for BZ integration")
+  call parse_input_variable(fmixing,"fmixing",finput,default='b',comment="Mix type: g=Weiss/Delta, b=bath")
+  call parse_input_variable(wmixing,"wmixing",finput,default=1.d0,comment="Mixing: New=w.New + (1-w).Old")
   !
   call ed_read_input(trim(finput),comm)
   !
@@ -78,6 +80,7 @@ program cdn_hm_2dsquare
   !  
   !Allocate Fields:
   allocate(Weiss(Nspin,Nspin,Nimp,Nimp,Lmats))
+  allocate(Wprev(Nspin,Nspin,Nimp,Nimp,Lmats))
   allocate(Gmats(Nspin,Nspin,Nimp,Nimp,Lmats))
   allocate(Greal(Nspin,Nspin,Nimp,Nimp,Lreal))
   allocate(Smats(Nspin,Nspin,Nimp,Nimp,Lmats))
@@ -114,7 +117,7 @@ program cdn_hm_2dsquare
   !
   if(Nsym==2)then
      do irepl=1,Nbath
-        lambdasym_vectors(irepl,2) = 1d0+noise(0.01d0)           !Recall that TS is contained in Hloc
+        lambdasym_vectors(irepl,2) = 1d0+noise(0.1d0)           !Recall that TS is contained in Hloc
      enddo
   endif
 
@@ -122,15 +125,12 @@ program cdn_hm_2dsquare
   call ed_set_Hbath(Hsym_basis,lambdasym_vectors)
   Nb=ed_get_bath_dimension(Nsym)
 
-
   !SETUP Hloc
   call ed_set_hloc(Hloc)
-  call print_matrix(Hloc)
 
   !SETUP SOLVER
   allocate(bath(Nb))
   call ed_init_solver(bath)
-
 
   allocate(bath_prev(Nb))
   bath_prev=zero
@@ -190,19 +190,22 @@ program cdn_hm_2dsquare
      call dmft_self_consistency(Gmats,Smats,Weiss)
      call dmft_write_gf(Weiss,"Weiss",axis='mats',iprint=4)
      !
+     if(fmixing=='g')then
+        if(iloop>1)Weiss = wmixing*Weiss + (1.d0-wmixing)*Wprev
+        Wprev = Weiss
+     endif
      !
      !Perform the SELF-CONSISTENCY by fitting the new bath
      call ed_chi2_fitgf(Weiss,bath)
      !
      !MIXING:
-     if(iloop>1)bath = wmixing*bath + (1.d0-wmixing)*bath_prev
-     bath_prev=bath
-     call Bcast_MPI(comm,bath)
-     !
+     if(fmixing=='b')then
+        if(iloop>1)bath = wmixing*bath + (1.d0-wmixing)*bath_prev
+        bath_prev=bath
+     endif
      !
      !Check convergence (if required change chemical potential)
      converged = check_convergence(Weiss(1,1,1,1,:),dmft_error,nsuccess,nloop)
-     call Bcast_MPI(comm,converged)
      !
      if(nread/=0d0)then
         allocate(dens_mats(Nimp))
@@ -221,8 +224,6 @@ program cdn_hm_2dsquare
         !
         dens_average = sum(dens_mats)/Nimp
         call search_chemical_potential(xmu,dens_average,converged)
-
-        call Bcast_MPI(comm,xmu)
         deallocate(dens_mats)
         deallocate(dens_ed)
      endif

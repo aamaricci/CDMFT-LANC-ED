@@ -47,6 +47,7 @@ contains
     allocate(array_bath(size(bath_)-1))
     Nlambdas   = nint(bath_(1))
     array_bath = bath_(2:)
+    print*,"in:",array_bath,size(array_bath),size(bath_(2:))
     !
     Ldelta = Lfit ; if(Ldelta>size(fg,5))Ldelta=size(fg,5)
     !
@@ -86,8 +87,7 @@ contains
     !
     !
     FGmatrix = fg
-    !
-    
+    !    
     select case(cg_method)     !0=NR-CG[default]; 1=CG-MINIMIZE
     case default
        if(cg_grad==0)then
@@ -172,7 +172,7 @@ contains
           stop "chi2_fitgf_replica_normal error: cg_scheme != [weiss,delta]"
        end select
     end select
-    
+    !
     write(LOGfile,"(A,ES18.9,A,I5,A)")"chi^2|iter"//reg(ed_file_suffix)//'= ',chi," | ",iter,"  <--  All Orbs, All Spins"
     !
     suffix="_ALLorb_ALLspins"//reg(ed_file_suffix)
