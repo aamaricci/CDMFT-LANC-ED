@@ -34,22 +34,22 @@ MODULE ED_OBSERVABLES_NORMAL
   public :: density_matrix_normal
 
 
-  logical,save                            :: iolegend=.true.
   real(8),dimension(:),allocatable        :: dens    ! orbital-resolved charge density
   real(8),dimension(:),allocatable        :: dens_up ! orbital-resolved spin-:math:`\uparrow` electron density
   real(8),dimension(:),allocatable        :: dens_dw ! orbital-resolved spin-:math:`\downarrow` electron density
   real(8),dimension(:),allocatable        :: docc    ! orbital-resolved double occupation
   real(8),dimension(:),allocatable        :: magz    ! orbital-resolved magnetization ( :code:`z` component )
   real(8),dimension(:,:),allocatable      :: n2      ! :math:`\langle n_{i} n_{j} \rangle` for i,j orbitals
-  real(8),dimension(:,:),allocatable      :: sz2     ! :math:`\langle S^{z}_{i} S^{z}_{j} \rangle` for i,j orbitals
-  real(8)                                 :: s2tot   ! :math:`\langle S_{z}^{2} \rangle`
+  real(8),dimension(:,:),allocatable      :: sz2     ! :math:`\langle S^{z}_{aI} S^{z}_{bJ} \rangle` for I,J sites and a,b orbitals
+  real(8),dimension(:),allocatable        :: s2lat   ! :math:`\langle \sum_a S_{aI}^{z}^{2} \rangle`
+  real(8)                                 :: s2tot   ! :math:`\langle \sum_{aI} S_{aI}^{z}^{2} \rangle`
   real(8)                                 :: Egs     ! Ground-state energy
   real(8)                                 :: Ei
   real(8)                                 :: integrationR
   complex(8),allocatable,dimension(:,:,:) :: sij
   complex(8),allocatable,dimension(:,:,:) :: Hk
   !
-  integer                                 :: iorb,jorb,iorb1,jorb1
+  integer                                 :: iorb,jorb,iorb1,jorb1,ilat,jlat,io,jo
   integer                                 :: ispin,jspin
   integer                                 :: ibath,jbath
   integer                                 :: r,m,k,k1,k2,k3,k4
@@ -90,7 +90,7 @@ contains
     !
     !LOCAL OBSERVABLES:
     allocate(dens(Nimp),dens_up(Nimp),dens_dw(Nimp))
-    allocate(docc(Nimp))
+    allocate(docc(Nimp),s2lat(Nlat))
     allocate(magz(Nimp),sz2(Nimp,Nimp),n2(Nimp,Nimp))
     !
     Egs     = state_list%emin
@@ -101,6 +101,7 @@ contains
     magz    = 0.d0
     sz2     = 0.d0
     n2      = 0.d0
+    s2lat   = 0.d0
     s2tot   = 0.d0
     !
     do istate=1,state_list%size
@@ -128,19 +129,25 @@ contains
              nt   =  nup+ndw
              !
              !Evaluate averages of observables:
-             do iorb=1,Nimp
-                dens(iorb)     = dens(iorb)      +  nt(iorb)*gs_weight
-                dens_up(iorb)  = dens_up(iorb)   +  nup(iorb)*gs_weight
-                dens_dw(iorb)  = dens_dw(iorb)   +  ndw(iorb)*gs_weight
-                docc(iorb)     = docc(iorb)      +  nup(iorb)*ndw(iorb)*gs_weight
-                magz(iorb)     = magz(iorb)      +  (nup(iorb)-ndw(iorb))*gs_weight
-                sz2(iorb,iorb) = sz2(iorb,iorb)  +  (sz(iorb)*sz(iorb))*gs_weight
-                n2(iorb,iorb)  = n2(iorb,iorb)   +  (nt(iorb)*nt(iorb))*gs_weight
-                do jorb=iorb+1,Nimp
-                   sz2(iorb,jorb) = sz2(iorb,jorb)  +  (sz(iorb)*sz(jorb))*gs_weight
-                   sz2(jorb,iorb) = sz2(jorb,iorb)  +  (sz(jorb)*sz(iorb))*gs_weight
-                   n2(iorb,jorb)  = n2(iorb,jorb)   +  (nt(iorb)*nt(jorb))*gs_weight
-                   n2(jorb,iorb)  = n2(jorb,iorb)   +  (nt(jorb)*nt(iorb))*gs_weight
+             do io=1,Nimp
+                dens(io)     = dens(io)     +  nt(io)*gs_weight
+                dens_up(io)  = dens_up(io)  +  nup(io)*gs_weight
+                dens_dw(io)  = dens_dw(io)  +  ndw(io)*gs_weight
+                docc(io)     = docc(io)     +  nup(io)*ndw(io)*gs_weight
+                magz(io)     = magz(io)     +  (nup(io)-ndw(io))*gs_weight
+                sz2(io,io)   = sz2(io,io)   +  (sz(io)*sz(io))*gs_weight
+                n2(io,io)    = n2(io,io)    +  (nt(io)*nt(io))*gs_weight
+                do jo=io+1,Nimp
+                   sz2(io,jo) = sz2(io,jo)  +  (sz(io)*sz(jo))*gs_weight
+                   sz2(jo,io) = sz2(jo,io)  +  (sz(jo)*sz(io))*gs_weight
+                   n2(io,jo)  = n2(io,jo)   +  (nt(io)*nt(jo))*gs_weight
+                   n2(jo,io)  = n2(jo,io)   +  (nt(jo)*nt(io))*gs_weight
+                enddo
+             enddo
+             do ilat=1,Nlat
+                do iorb=1,Norb
+                   io = iorb + (ilat-1)*Norb
+                   s2lat(ilat)= s2lat(ilat) +  (sz(io)*sz(io))*gs_weight
                 enddo
              enddo
              s2tot = s2tot  + (sum(sz))**2*gs_weight
@@ -156,7 +163,6 @@ contains
     !
     !
     if(MPIMASTER)then
-       if(iolegend)call write_legend
        call write_observables()
        !
        write(LOGfile,"(A,10f18.12,f18.12)")"dens "//reg(ed_file_suffix)//"=",(dens(iorb),iorb=1,Nimp),sum(dens)
@@ -179,7 +185,7 @@ contains
     endif
 #endif
     !
-    deallocate(dens,docc,dens_up,dens_dw,magz,sz2,n2)
+    deallocate(dens,docc,dens_up,dens_dw,magz,s2lat,sz2,n2)
   end subroutine observables_normal
 
 
@@ -403,10 +409,7 @@ contains
        write(LOGfile,"(A)")" "
     endif
     !
-    if(MPIMASTER)then
-       call write_energy_info()
-       call write_energy()
-    endif
+    call write_energy()
     !
     !
   end subroutine local_energy_normal
@@ -621,25 +624,16 @@ contains
   !                        PRINTING ROUTINES
   !####################################################################
   !+-------------------------------------------------------------------+
-  !PURPOSE  : write legend, i.e. info about columns 
+  !PURPOSE  : write observables to file
   !+-------------------------------------------------------------------+
-  subroutine write_legend()
-    integer :: unit,iorb,jorb,ispin
-    unit = free_unit()
+  subroutine write_observables()
+    integer                          :: unit
+    integer                          :: iorb,jorb,ispin
+    character(len=64)                :: fname,suffix
+    integer                          :: Nrdm,io,jo,ilat,jlat
+    !
     if(MpiMaster)then
-       open(unit,file="observables_info.ed")
-       write(unit,"(A1,90(A10,6X))")"#",&
-            (reg(txtfy(iorb))//"dens_"//reg(txtfy(iorb)),iorb=1,Nimp),&
-            (reg(txtfy(Nimp+iorb))//"docc_"//reg(txtfy(iorb)),iorb=1,Nimp),&
-            (reg(txtfy(2*Nimp+iorb))//"nup_"//reg(txtfy(iorb)),iorb=1,Nimp),&
-            (reg(txtfy(3*Nimp+iorb))//"ndw_"//reg(txtfy(iorb)),iorb=1,Nimp),&
-            (reg(txtfy(4*Nimp+iorb))//"mag_"//reg(txtfy(iorb)),iorb=1,Nimp),&
-            reg(txtfy(5*Nimp+1))//"s2",&
-            reg(txtfy(5*Nimp+2))//"egs",&
-            ((reg(txtfy(5*Nimp+2+(iorb-1)*Nimp+jorb))//"sz2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Nimp),iorb=1,Nimp),&
-            ((reg(txtfy((5+Nimp)*Nimp+2+(iorb-1)*Nimp+jorb))//"n2_"//reg(txtfy(iorb))//reg(txtfy(jorb)),jorb=1,Nimp),iorb=1,Nimp)
-       close(unit)
-       !
+       !Write Parameters:
        unit = free_unit()
        open(unit,file="parameters_info.ed")
        write(unit,"(A1,90(A14,1X))")"#","1xmu","2beta",&
@@ -647,122 +641,81 @@ contains
             reg(txtfy(2+Norb+1))//"U'",reg(txtfy(2+Norb+2))//"Jh"
        close(unit)
        !
-       iolegend=.false.
-    endif
-  end subroutine write_legend
-
-
-
-  subroutine write_energy_info()
-    integer :: unit
-    if(MpiMaster)then
-       unit = free_unit()
-       open(unit,file="energy_info.ed")
-       write(unit,"(A1,90(A14,1X))")"#",&
-            reg(txtfy(1))//"<Hi>",&
-            reg(txtfy(2))//"<V>=<Hi-Ehf>",&
-            reg(txtfy(3))//"<Eloc>",&
-            reg(txtfy(4))//"<Ehf>",&
-            reg(txtfy(5))//"<Dst>",&
-            reg(txtfy(6))//"<Dnd>"
-       close(unit)
-    endif
-  end subroutine write_energy_info
-
-
-
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : write observables to file
-  !+-------------------------------------------------------------------+
-  subroutine write_observables()
-    integer                          :: unit
-    integer                          :: iorb,jorb,ispin
-    character(len=64)                :: fname,suffix
-    integer                          :: Nrdm,io,jo
-    !
-    if(MpiMaster)then
-       unit = free_unit()
-       open(unit,file="observables_all"//reg(ed_file_suffix)//".ed",position='append')
-       write(unit,"(90(F15.9,1X))")&
-            (dens(iorb),iorb=1,Nimp),&
-            (docc(iorb),iorb=1,Nimp),&
-            (dens_up(iorb),iorb=1,Nimp),&
-            (dens_dw(iorb),iorb=1,Nimp),&
-            (magz(iorb),iorb=1,Nimp),&
-            s2tot,egs,&
-            ((sz2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp),&
-            ((n2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp)
-       close(unit)
-       !
        unit = free_unit()
        open(unit,file="parameters_last"//reg(ed_file_suffix)//".ed")
        write(unit,"(90F15.9)")xmu,beta,(uloc(iorb),iorb=1,Norb),Ust,Jh,Jx,Jp
        close(unit)
        !
+       !
+       !Write variables:
        unit = free_unit()
-       open(unit,file="observables_last"//reg(ed_file_suffix)//".ed")
-       write(unit,"(90(F15.9,1X))")&
-            (dens(iorb),iorb=1,Nimp),&
-            (docc(iorb),iorb=1,Nimp),&
-            (dens_up(iorb),iorb=1,Nimp),&
-            (dens_dw(iorb),iorb=1,Nimp),&
-            (magz(iorb),iorb=1,Nimp),&
-            s2tot,egs,&
-            ((sz2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp),&
-            ((n2(iorb,jorb),jorb=1,Nimp),iorb=1,Nimp)
+       open(unit,file="observables_info.ed")
+       write(unit,"(A1,*(A10,6X))")"#",&
+            (str(iorb)//"dens_"//str(iorb),iorb=1,Norb),&
+            (str(Norb+iorb)//"docc_"//str(iorb),iorb=1,Norb),&
+            (str(2*Norb+iorb)//"nup_"//str(iorb),iorb=1,Norb),&
+            (str(3*Norb+iorb)//"ndw_"//str(iorb),iorb=1,Norb),&
+            (str(4*Norb+iorb)//"mag_"//str(iorb),iorb=1,Norb),&
+            str(5*Norb+1)//"s2lat",&
+            str(5*Norb+2)//"s2tot",&
+            str(5*Norb+3)//"egs"
        close(unit)
+       !
+       do ilat=1,Nlat
+          unit = free_unit()
+          open(unit,file="observables_all_site"//str(ilat,3)//reg(ed_file_suffix)//".ed",position='append')
+          write(unit,"(*(F15.9,1X))")&
+               (dens(iorb),iorb=1,Norb),&
+               (docc(iorb),iorb=1,Norb),&
+               (dens_up(iorb),iorb=1,Norb),&
+               (dens_dw(iorb),iorb=1,Norb),&
+               (magz(iorb),iorb=1,Norb),&
+               s2lat(ilat),s2tot,egs
+          close(unit)
+          !
+          unit = free_unit()
+          open(unit,file="observables_last_site"//str(ilat,3)//reg(ed_file_suffix)//".ed")
+          write(unit,"(*(F15.9,1X))")&
+               (dens(iorb),iorb=1,Norb),&
+               (docc(iorb),iorb=1,Norb),&
+               (dens_up(iorb),iorb=1,Norb),&
+               (dens_dw(iorb),iorb=1,Norb),&
+               (magz(iorb),iorb=1,Norb),&
+               s2lat(ilat),s2tot,egs
+          close(unit)
+       enddo
        !
        unit = free_unit()
        open(unit,file="Sz_ij_ab_last"//reg(ed_file_suffix)//".ed")
-       write(unit,"(A)")"#a, b, Sz(I,J,a,b)"
-       do iorb=1,Nimp
-          do jorb=1,Nimp
-             write(unit,"(2I15,F15.9)")iorb,jorb,sz2(iorb,jorb)
+       write(unit,"(A1,4A6,A15)")"#","I","J","a","b","Sz(I,J,a,b)"
+       do ilat=1,Nlat
+          do jlat=1,Nlat
+             do iorb=1,Norb
+                do jorb=1,Norb
+                   io = iorb + (ilat-1)*Norb
+                   jo = jorb + (jlat-1)*Norb
+                   write(unit,"(1X,4I6,F15.9)")ilat,jlat,iorb,jorb,sz2(io,jo)
+                enddo
+             enddo
           enddo
        enddo
        close(unit)
        !
        unit = free_unit()
        open(unit,file="N2_ij_ab_last"//reg(ed_file_suffix)//".ed")
-       write(unit,"(A)")"#a, b, N2(I,J,a,b)"
-       do iorb=1,Nimp
-          do jorb=1,Nimp
-             write(unit,"(2I15,F15.9)")iorb,jorb,n2(iorb,jorb)
+       write(unit,"(A1,4A6,A15)")"#","I","J","a","b","N2(I,J,a,b)"
+       do ilat=1,Nlat
+          do jlat=1,Nlat
+             do iorb=1,Norb
+                do jorb=1,Norb
+                   io = iorb + (ilat-1)*Norb
+                   jo = jorb + (jlat-1)*Norb
+                   write(unit,"(1X,4I6,F15.9)")ilat,jlat,iorb,jorb,n2(io,jo)
+                enddo
+             enddo
           enddo
        enddo
        close(unit)
-       !
-       Nrdm = 4**Nimp
-       associate(dm => cluster_density_matrix)
-         unit = free_unit()
-         open(unit,file="cluster_density_matrix"//reg(ed_file_suffix)//".ed")
-         do io=1,Nrdm
-            write(unit,"(*(F20.16,1X))") (dreal(dm(io,jo)),jo=1,Nrdm)
-         enddo
-         if(any(dimag(dm)/=0d0))then
-            write(unit,*)
-            do io=1,Nrdm
-               write(unit,"(*(F20.16,1X))") (dimag(dm(io,jo)),jo=1,Nrdm)
-            enddo
-         endif
-         close(unit)
-       end associate
-       !
-       do ispin=1,Nspin
-          unit = free_unit()
-          open(unit,file="single_particle_density_matrix_s"//str(ispin)//reg(ed_file_suffix)//".ed")
-          do io=1,Nimp
-             write(*,*) (dreal(single_particle_density_matrix(1,1,ispin,ispin,io,jo)),jo=1,Nimp)
-             write(unit,"(*(F20.16,1X))") (dreal(single_particle_density_matrix(1,1,ispin,ispin,io,jo)),jo=1,Nimp)
-          enddo
-          if(any(dimag(single_particle_density_matrix)/=0d0))then
-             write(unit,*)
-             do io=1,Nimp
-                write(unit,"(*(F20.16,1X))") (dimag(single_particle_density_matrix(1,1,ispin,ispin,io,jo)),jo=1,Nimp)
-             enddo
-          endif
-          close(unit)
-       enddo
        !
     end if
     !
@@ -776,6 +729,17 @@ contains
     integer :: unit
     if(MpiMaster)then
        unit = free_unit()
+       open(unit,file="energy_info.ed")
+       write(unit,"(A1,90(A14,1X))")"#",&
+            reg(txtfy(1))//"<Hi>",&
+            reg(txtfy(2))//"<V>=<Hi-Ehf>",&
+            reg(txtfy(3))//"<Eloc>",&
+            reg(txtfy(4))//"<Ehf>",&
+            reg(txtfy(5))//"<Dst>",&
+            reg(txtfy(6))//"<Dnd>"
+       close(unit)
+       !       
+       unit = free_unit()
        open(unit,file="energy_last"//reg(ed_file_suffix)//".ed")
        write(unit,"(90F15.9)")ed_Epot,ed_Epot-ed_Ehartree,ed_Eknot,ed_Ehartree,ed_Dust,ed_Dund,ed_Dse,ed_Dph
        close(unit)
@@ -783,7 +747,7 @@ contains
   end subroutine write_energy
 
 
-  
+
   subroutine write_dm()
     integer                          :: unit
     integer                          :: ispin
@@ -828,6 +792,11 @@ contains
     end if
     !
   end subroutine write_dm
+
+
+
+
+
 
 END MODULE ED_OBSERVABLES_NORMAL
 

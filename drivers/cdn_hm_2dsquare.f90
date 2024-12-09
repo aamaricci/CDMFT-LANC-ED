@@ -184,11 +184,11 @@ program cdn_hm_2dsquare
 
      !Compute the local gfs on the imaginary axis:
      call dmft_get_gloc(Hk,Gmats,Smats,axis="m")
-     call dmft_write_gf(Gmats,"Gloc",axis='matsubara',iprint=4)
+     call dmft_write_gf(rank6(Gmats,Lmats),"Gloc",axis='matsubara',iprint=4)
      !
      !Get the Weiss field/Delta function to be fitted
      call dmft_self_consistency(Gmats,Smats,Weiss)
-     call dmft_write_gf(Weiss,"Weiss",axis='mats',iprint=4)
+     call dmft_write_gf(rank6(Weiss,Lmats),"Weiss",axis='mats',iprint=4)
      !
      if(fmixing=='g')then
         if(iloop>1)Weiss = wmixing*Weiss + (1.d0-wmixing)*Wprev
@@ -235,7 +235,7 @@ program cdn_hm_2dsquare
   !Compute the local gfs on the real axis:
   call ed_get_sigma(Sreal,axis='real')
   call dmft_get_gloc(Hk,Greal,Sreal,axis='real')
-  call dmft_write_gf(Greal,"Gloc",axis='real',iprint=4)
+  call dmft_write_gf(rank6(Greal,Lreal),"Gloc",axis='real',iprint=4)
 
   !Compute the Kinetic Energy:
   call dmft_kinetic_energy(Hk(:,:,:),nn2so_f(Smats,Lmats))
@@ -529,6 +529,20 @@ contains
        Out(is,js,i,j,:) = In(io,jo,:)
     enddo
   end function so2nn_f
+
+
+  function rank6(In,L) result(Out)
+    integer                                                 :: L 
+    complex(8),dimension(Nspin,Nspin,Nimp,Nimp,L)           :: In
+    complex(8),dimension(Nlat,Nlat,Nspin,Nspin,Norb,Norb,L) :: Out
+    integer                                                 :: il,jl,is,js,io,jo,i,j
+    do concurrent(il=1:Nlat,jl=1:Nlat,is=1:Nspin,js=1:Nspin,io=1:Norb,jo=1:Norb)
+       i = io + (il-1)*Norb
+       j = jo + (jl-1)*Norb
+       Out(il,jl,is,js,io,jo,:) = In(is,js,i,j,:)
+    enddo
+  end function Rank6
+
 
 end program cdn_hm_2dsquare
 
