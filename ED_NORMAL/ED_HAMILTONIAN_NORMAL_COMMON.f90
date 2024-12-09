@@ -70,6 +70,7 @@ contains
     integer,allocatable,dimension(:,:)    :: recv_counts,recv_offset
     integer                               :: counts,Ntot
     integer                               :: i,j,irank,ierr
+    complex(8),dimension(:),allocatable :: Vtmp
     !
     counts = Nrow/MpiSize
     Ntot   = Ncol/MpiSize
@@ -117,10 +118,16 @@ contains
     !
     !
     do j=1,Ntot
+       if(j<=size(A,2))then
+          Vtmp = A(:,j)            !automatic allocation
+       else
+          allocate(Vtmp(0))
+       endif
        call MPI_AllToAllV(&
-            A(:,j),send_counts(:,j),send_offset(:,j),MPI_DOUBLE_COMPLEX,&
+            Vtmp,send_counts(:,j),send_offset(:,j),MPI_DOUBLE_COMPLEX,&
             B(:,:),recv_counts(:,j),recv_offset(:,j),MPI_DOUBLE_COMPLEX,&
             MpiComm,ierr)
+       deallocate(Vtmp)
     enddo
     !
     call local_transpose(b,ncol,qrow)

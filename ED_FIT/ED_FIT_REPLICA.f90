@@ -47,7 +47,6 @@ contains
     allocate(array_bath(size(bath_)-1))
     Nlambdas   = nint(bath_(1))
     array_bath = bath_(2:)
-    print*,"in:",array_bath,size(array_bath),size(bath_(2:))
     !
     Ldelta = Lfit ; if(Ldelta>size(fg,5))Ldelta=size(fg,5)
     !

@@ -159,7 +159,7 @@ program cdn_hm_2dsquare
               orbital_mask(io) = .true.
               call ed_get_reduced_dm(reduced_density_matrix,orbital_mask,doprint=.true.)
               !Semi-analytical crosscheck of the single-orbital density matrix            
-              call one_orb_benchmark(ilat,1,reduced_density_matrix)
+              call one_orb_benchmark(ilat,iorb,reduced_density_matrix)
            enddo
         enddo
         ! All independent two-site RDMs (to check NN and NNN are equal)

@@ -20,8 +20,8 @@ end subroutine ed_get_cluster_density_matrix_single
 
 
 
-  !****************************************************************************************!
-  !****************************************************************************************!
+!****************************************************************************************!
+!****************************************************************************************!
 
 
 
@@ -59,13 +59,15 @@ subroutine ed_get_reduced_density_matrix_single(rdm,orbital_mask,doprint)
   endif
   doprint_=.false.; if(present(doprint)) doprint_=doprint
   !
+  if(allocated(rdm))deallocate(rdm)
+  !
   ! Retrieve cdm from the global scope
   if(.not.allocated(cluster_density_matrix))stop "ERROR: cluster_density_matrix is not allocated"
   !  
   associate(cdm => cluster_density_matrix)
     if(.not.dotrace_)then
        ! Pour the whole cdm into the rdm
-       rdm = cdm ! and that's all we do…
+       allocate(rdm, source=cdm) ! and that's all we do…
     else
        ! Retrieve the requested bit-indices for the reduced/traced system
        red_count   = 0

@@ -417,14 +417,13 @@ contains
   !+------------------------------------------------------------------+
   !                      PRINT DENSITY MATRICES
   !+------------------------------------------------------------------+
-  subroutine ed_print_dm_orb(dm,orbital_mask,ineq)
-    complex(8),dimension(:,:),intent(in)          :: dm
-    logical,dimension(Nimp),intent(in)            :: orbital_mask
-    integer                  ,intent(in),optional :: ineq
-    integer                                       :: unit,Nsites
-    character(len=64)                             :: fname,suffix
-    integer                                       :: ilat,iorb,Nrdm,io
-    integer,allocatable,dimension(:)              :: s1,s2,s3,s4
+  subroutine ed_print_dm_orb(dm,orbital_mask)
+    complex(8),dimension(:,:),intent(in) :: dm
+    logical,dimension(Nimp),intent(in)   :: orbital_mask
+    integer                              :: unit,Nsites
+    character(len=64)                    :: fname,suffix
+    integer                              :: ilat,iorb,Nrdm,io
+    integer,allocatable,dimension(:)     :: s1,s2,s3,s4
     !
     Nrdm = 4**count(orbital_mask)
     !
@@ -437,41 +436,32 @@ contains
        do iorb = 1,Norb
           i = iorb + (ilat-1)*Norb
           if(orbital_mask(i))then
-             suffix = trim(suffix)//"_i"//reg(str(io))//"l"//reg(str(jo))
+             suffix = trim(suffix)//"_i"//reg(str(ilat))//"l"//reg(str(iorb))
           endif
        enddo
     enddo
-    if(present(ineq))then
-       fname = "reduced_density_matrix"//trim(suffix)//"_ineq"//reg(str(ineq))//".dat"
-    else
-       fname = "reduced_density_matrix"//trim(suffix)//".dat"
-    endif
+    fname = "reduced_density_matrix"//trim(suffix)//".dat"
     !
     unit = free_unit()
     open(unit,file=fname,action="write",position="rewind",status='unknown')
-    !
     do io=1,Nrdm
        write(unit,"(*(F20.16,1X))") (dreal(dm(io,jo)),jo=1,Nrdm)
     enddo
-    write(unit,*)
-    !
     if(any(dimag(dm)/=0d0))then
+       write(unit,*)
        do io=1,Nrdm
           write(unit,"(*(F20.16,1X))") (dimag(dm(io,jo)),jo=1,Nrdm)
        enddo
-       write(unit,*)
     endif
-    !
     close(unit)
     !
   end subroutine ed_print_dm_orb
   !
+  
   !
-  !
-  subroutine ed_print_dm_LEGACY(dm,Nrdm,ineq)
+  subroutine ed_print_dm_LEGACY(dm,Nrdm)
     integer                  ,intent(in)            :: Nrdm
     complex(8),dimension(:,:),intent(in)            :: dm
-    integer                  ,intent(in),optional   :: ineq
     integer                                         :: unit,Nsites
     character(len=64)                               :: fname
     integer                                         :: io,jo
@@ -482,27 +472,19 @@ contains
     !
     Nsites = nint( 1/Norb * log(real(Nrdm,kind=8)) / log(4d0) ) !Nrdm = 4**(Nsites*Norb)
     !
-    if(present(ineq))then
-       fname = "reduced_density_matrix_"//reg(str(Nsites))//"sites_ineq"//reg(str(ineq))//".dat"
-    else
-       fname = "reduced_density_matrix_"//reg(str(Nsites))//"sites.dat"
-    endif
+    fname = "reduced_density_matrix_"//reg(str(Nsites))//".dat"
     !
     unit = free_unit()
     open(unit,file=fname,action="write",position="rewind",status='unknown')
-    !
     do io=1,Nrdm
        write(unit,"(*(F20.16,1X))") (dreal(dm(io,jo)),jo=1,Nrdm)
     enddo
-    write(unit,*)
-    !
     if(any(dimag(dm)/=0d0))then
+       write(unit,*)
        do io=1,Nrdm
           write(unit,"(*(F20.16,1X))") (dimag(dm(io,jo)),jo=1,Nrdm)
        enddo
-       write(unit,*)
     endif
-    !
     close(unit)
     !
   end subroutine ed_print_dm_LEGACY
