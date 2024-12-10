@@ -1,15 +1,16 @@
 # Cluster-DMFT Lanczos Exact Diagonalization
 
-A Lanczos based solver for the **Cluster** Dynamical Mean-Field Theory using the `N_up:N_dw` implementation in the normal phase (plus long-range magnetic or charge order).  
+A Lanczos based solver for the **Cluster** Dynamical Mean-Field Theory. The code features solution of the normal (including long range order) problem as well as the superconducting state with different, user enabled, symmetries of the order parameter. 
 
+The `ed_mode=normal` operative mode uses $N_\uparrow$:$N_\downarrow$ quantum numbers and massively parallel execution outlined here [j.cpc.2021.108261](https://doi.org/10.1016/j.cpc.2021.108261). 
+The newly developed `ed_mode=superc` operative mode conserves the total spin projection $S_z=N_\uparrow-N_\downarrow$.  
 
-SUPERC Code
 
 The code is based on:  
 
 * [SciFortran](https://github.com/QcmPlab/SciFortran)  
 
-* [DMFTtools](https://github.com/QcmPlab/DMFTtools)
+* [DMFTtools](https://github.com/QcmPlab/DMFTtools) [for the driver development only]
 
 The code structure is as follow:  
 
@@ -53,12 +54,17 @@ The code structure is as follow:
 - [x] Replicate the single-site results in [Su, Dai,Tong 2013](https://doi.org/10.1142/S0217984913500346).
 - [x] Replicate the (vanishing T) 2x2 results in [C. Walsh et al. 2019](https://doi.org/10.1103/PhysRevLett.122.067203).
 
+### MILESTONE 5
+- [x] rewrite the code using a better suited setup to include superconductivity, i.e. arrays of the form `[Nambu,Nambu,Nspin,Nspin,Nlat*Norb,Nlat*Norb]` where `Nambu=1,2` according to `ed_mode=normal,superc` contains the possible Nambu components of the arrays, `Nspin` is the number of independent spin channels, `Nlat` is the number of sites in  the cluster, `Norb` the number of electronic orbitals on each site. 
+- [x] extend the code to include superconductive channel
+- [x] split and entirely review the fit part
+- [x] test `ed_mode=normal` against old code and single site results
+- [ ] test `ed_mode=superc` against single site `EDIPACK2` results. 
+   
+
 --
 
 ***COPYRIGHT & LICENSING***  
-Copyright 2012 -  (c) Adriano Amaricci, Lorenzo Crippa, Gabriele Bellomia, Samuele Giuli, Massimo Capone.  
-All rights reserved. 
-
 The software is provided with no license, as such it is protected by copyright. The software is provided as it is and can be read and copied, in agreement with the Terms of Service of GITHUB. 
 Use of the code is constrained to authors agreement.   
 
